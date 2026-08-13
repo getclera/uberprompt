@@ -5,7 +5,8 @@ NOTE (aligned): we build along the 4 pipeline stages in IDEA.md. Salvage from th
 branches listed in IDEA.md instead of rewriting.
 
 ## Setup
-- [ ] (talwe — HUMAN) Atlas cluster, db `uberprompt`, vector indexes, `.env` (MONGODB_URI, ANTHROPIC_API_KEY, VOYAGE_API_KEY)
+- [x] (talwe+claude) Atlas cluster `cluster0.u7elw1` up, db `uberprompt` + 6 collections + 3 vector indexes (fragments/descriptions/lessons, 1024d cosine) created; MONGODB_URI in .env; MongoDB MCP in .mcp.json (needs session restart + approve)
+- [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
 - [ ] (unclaimed) Re-land monorepo + SDK from `claude/sdk-scaffold` once plan is locked
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
