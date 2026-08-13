@@ -13,6 +13,15 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.68.0
         version: 0.68.0(zod@4.4.3)
+      archy:
+        specifier: ^1.0.0
+        version: 1.0.0
+      mongodb:
+        specifier: ^6.18.0
+        version: 6.21.0
+      openai:
+        specifier: ^6.9.0
+        version: 6.49.0(zod@4.4.3)
 
   packages/sdk:
     dependencies:
@@ -351,6 +360,9 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  archy@1.0.0:
+    resolution: {integrity: sha512-Xg+9RwCg/0p32teKdGMPTPnVXKD0w3DfHnFTficozsAgsvq2XenPJq/MYpzzQ/v8zrOyJn6Ds39VA4JIDwFfqw==}
+
   bson@6.10.4:
     resolution: {integrity: sha512-WIsKqkSC0ABoBJuT1LEX+2HEvNmNKKgnTAyd0fL8qzK4SH2i9NXg+t08YtdZp/V9IZ33cxe3iV4yM0qg8lMQng==}
     engines: {node: '>=16.20.1'}
@@ -410,6 +422,26 @@ packages:
       snappy:
         optional: true
       socks:
+        optional: true
+
+  openai@6.49.0:
+    resolution: {integrity: sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
         optional: true
 
   punycode@2.3.1:
@@ -653,6 +685,8 @@ snapshots:
       '@ai-sdk/provider-utils': 5.0.27(zod@3.25.76)
       zod: 3.25.76
 
+  archy@1.0.0: {}
+
   bson@6.10.4: {}
 
   esbuild@0.28.2:
@@ -710,6 +744,10 @@ snapshots:
       '@mongodb-js/saslprep': 1.4.13
       bson: 6.10.4
       mongodb-connection-string-url: 3.0.2
+
+  openai@6.49.0(zod@4.4.3):
+    optionalDependencies:
+      zod: 4.4.3
 
   punycode@2.3.1: {}
 
