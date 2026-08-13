@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SCRIPTS = { init: "init.ts", collect: "collect.ts", tail: "tail.ts" };
+const SCRIPTS = { init: "init.ts", collect: "collect.ts", tail: "tail.ts", compare: "compare.ts" };
 
 // The workspace is found from this file's own location, not from cwd: the CLI is
 // installed as a bin and is routinely run from outside the repo, where the caller's
@@ -31,6 +31,8 @@ export function runTracing(command, cliRoot, opts) {
   const env = { ...process.env };
   if (opts.port) env.UBERPROMPT_COLLECT_PORT = String(opts.port);
   if (opts.service) env.UBERPROMPT_COLLECT_SERVICE = String(opts.service);
+  if (opts._[1]) env.UBERPROMPT_COMPARE_PROMPT = String(opts._[1]);
+  if (opts.json) env.UBERPROMPT_COMPARE_JSON = "1";
 
   const envFile = join(root, ".env");
   const args = ["tsx"];
