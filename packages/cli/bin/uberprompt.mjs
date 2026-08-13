@@ -78,6 +78,10 @@ Commands:
                           --service <name> fallback service.name
   tail                  Print recent traces, then stream new ones live via a
                         MongoDB change stream.
+  compare [prompt]      Per prompt version: traces, error rate, score, latency,
+                        tokens - and the version-over-version delta. This is how
+                        you see whether a new prompt version actually helped.
+                          --json
 
   help                  Show this message.
 
@@ -108,6 +112,7 @@ async function main() {
     case "init":
     case "collect":
     case "tail":
+    case "compare":
       return await runTracing(cmd, root, opts);
     case "help":
     case undefined:
