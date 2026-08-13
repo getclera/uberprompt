@@ -150,6 +150,12 @@ export async function runInfer(dir, repoRoot, opts) {
   for (const e of raw) {
     if (!e.from || !e.to || !e.to.fragment) continue;
     if (e.from.prompt === null) delete e.from.prompt;
+    if (e.from.prompt) {
+      const owner = model.prompts.get(e.from.prompt);
+      if (!owner || !(owner.fragments || []).some((f) => f.key === e.from.fragment)) continue;
+    } else if (!model.fragments.has(e.from.fragment)) {
+      continue;
+    }
     if (e.from.fragment && e.from.fragment.includes(".")) {
       const dot = e.from.fragment.indexOf(".");
       const head = e.from.fragment.slice(0, dot);
