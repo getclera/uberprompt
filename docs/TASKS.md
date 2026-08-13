@@ -23,7 +23,7 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.ts, raise-escalation-threshold)
-- [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
+- [x] (felix/claude) `uberprompt` CLI: infer / affected / graph (packages/cli)
 - [x] (felix/claude) CLI graph visualization: `uberprompt graph [node]` map/tree/impact views + tests
   - Evaluated external renderers for the map (beautiful-mermaid, diagonjs, d2, graph-easy):
     all break down or spaghetti on our dense bipartite graph, or need a non-npm binary.
@@ -70,12 +70,17 @@ branches listed in IDEA.md instead of rewriting.
       Mongo `edges` graph walk (buildGraph/dependentsOf over a thin adapter,
       shared-node aware) ∪ `$vectorSearch` discovery (cosine >= 0.80, top 5)
       with new `kind:"semantic"` edges persisted straight into the `edges`
-      collection (confidence/model/inferredAt) — closes the "infer --apply
-      doesn't reach Mongo" gap for the sync path. gpt-5.1 consistency check
+      collection (confidence/model/inferredAt). gpt-5.1 consistency check
       files `source:"sync-check"` proposals for real conflicts. Plus:
       `uberprompt reembed` (embedding-space backfill + verify) and
       `uberprompt rollback <prompt> [--to N]` — restores a snapshot as a new
       version (append-only) and fires the sync check.
+  - (felix) Semantic edges now survive a demo reset: `seed-demo` reseeds the
+    `kind:"semantic"` edges from `edges.json` (idempotent delete+insert) and
+    `uberprompt infer --apply` upserts each applied edge into the `edges`
+    collection keyed by (from.prompt, from.fragment, to.fragment, kind) when
+    MONGODB_URI is set — file-only with a printed note otherwise. Closes the
+    `infer --apply doesn't reach Mongo` gap for the CLI path too.
   - (felix) Full-chain e2e on the Mango demo against live Atlas: reseed →
     lesson → propose → approve refund-agent.refund-policy → infer found both
     answer-key semantic edges → sync-check walked them, filed + approved the

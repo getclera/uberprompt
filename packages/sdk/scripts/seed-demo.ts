@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import {
   closeDb,
   definePrompt,
+  edgesCol,
   promptVersionsCol,
   tracesCol,
+  type EdgeDoc,
   type TokenUsage,
   type TraceDoc,
   type UsesEdge,
@@ -31,6 +33,9 @@ interface EdgeFile {
   to: { prompt?: string; fragment?: string };
   kind: "uses" | "semantic";
   note?: string;
+  confidence?: number;
+  model?: string;
+  inferredAt?: string;
 }
 
 interface TraceSeedFile {
@@ -97,6 +102,28 @@ async function seedPrompts(): Promise<void> {
   }
 }
 
+async function seedSemanticEdges(): Promise<void> {
+  const edges = readJson<EdgeFile[]>(join(demoDir, "edges.json")).filter(
+    (edge) => edge.kind === "semantic",
+  );
+  await edgesCol().deleteMany({ kind: "semantic" });
+  if (edges.length === 0) {
+    console.log("no semantic edges to seed");
+    return;
+  }
+  const docs: EdgeDoc[] = edges.map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+    kind: "semantic" as const,
+    ...(edge.note ? { note: edge.note } : {}),
+    ...(edge.confidence !== undefined ? { confidence: edge.confidence } : {}),
+    ...(edge.model ? { model: edge.model } : {}),
+    ...(edge.inferredAt ? { inferredAt: new Date(edge.inferredAt) } : {}),
+  }));
+  await edgesCol().insertMany(docs);
+  console.log(`seeded ${docs.length} semantic edges`);
+}
+
 function seedTokens(tokens: object | undefined): TokenUsage | undefined {
   if (tokens === undefined) return undefined;
   const { input, output } = tokens as { input?: number; output?: number };
@@ -150,6 +177,7 @@ async function seedTraces(): Promise<void> {
 
 async function main(): Promise<void> {
   await seedPrompts();
+  await seedSemanticEdges();
   await seedTraces();
   await closeDb();
 }

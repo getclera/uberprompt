@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadModel, nonEmptyFragments, refNodeId } from "./load.ts";
+import { loadEnv, connect } from "./store.ts";
 import type { CliOpts, Model, Ref } from "./types.ts";
 
 const MODEL = "gpt-5-nano";
@@ -226,5 +227,52 @@ export async function runInfer(dir: string, repoRoot: string, opts: CliOpts): Pr
   }
   writeFileSync(model.edgesPath, JSON.stringify(model.edges, null, 2) + "\n");
   console.log(`Applied ${added} semantic edge(s) to ${model.edgesPath}.`);
+
+  await upsertSemanticEdges(repoRoot, proposed, now);
   return 0;
+}
+
+async function upsertSemanticEdges(
+  repoRoot: string,
+  proposed: InferEdge[],
+  now: string,
+): Promise<void> {
+  const env = loadEnv(repoRoot);
+  if (!env.MONGODB_URI) {
+    console.log("MONGODB_URI not set — wrote edges.json only, skipped Mongo upsert.");
+    return;
+  }
+  const { client, db } = await connect(env);
+  try {
+    const col = db.collection("edges");
+    let upserted = 0;
+    let matched = 0;
+    for (const e of proposed) {
+      const prompt = e.from.prompt ?? undefined;
+      const key: Record<string, unknown> = {
+        "from.fragment": e.from.fragment,
+        "to.fragment": e.to.fragment,
+        kind: "semantic",
+        "from.prompt": prompt ? prompt : { $exists: false },
+      };
+      const set: Record<string, unknown> = {
+        "from.fragment": e.from.fragment,
+        "to.fragment": e.to.fragment,
+        kind: "semantic",
+        note: e.reason,
+        confidence: e.confidence,
+        model: MODEL,
+        inferredAt: new Date(now),
+      };
+      if (prompt) set["from.prompt"] = prompt;
+      const res = await col.updateOne(key, { $set: set }, { upsert: true });
+      if (res.upsertedCount > 0) upserted++;
+      else matched++;
+    }
+    console.log(
+      `Upserted ${upserted} new + refreshed ${matched} existing semantic edge(s) in the Mongo edges collection.`,
+    );
+  } finally {
+    await client.close();
+  }
 }
