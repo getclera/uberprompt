@@ -18,8 +18,7 @@ land in Mongo and roll up into traces pinned to the exact prompt version that
 produced them. An analyzer mines trace batches into lessons — durable, embedded
 memory entries, vector-deduped against what the system already knows. Lessons
 become minimal-edit proposals, targeted at the right prompts by a
-lineage → LLM-catalog → vector-RAG ladder and screened by an eval gate that
-replays real traces against a golden set. A human approves the diff; the version
+lineage → LLM-catalog → vector-RAG ladder. A human approves the diff; the version
 bumps, an immutable content-hashed snapshot freezes, the fragment re-embeds.
 
 Then the part nobody else does: the bump ripples. überprompt walks the prompt
@@ -38,7 +37,7 @@ zero bolt-ons.
 - **Technical depth** — a real OTel→Atlas ingestion pipeline (idempotent
   `$merge` rollup, content-addressed prompt versioning with append-only
   snapshots), vector-discovered *undeclared* prompt dependencies that the
-  declared graph provably misses, and an eval gate with pairwise judging —
+  declared graph provably misses —
   all verified live in [PIPELINE-TEST.md](PIPELINE-TEST.md) with real output.
 - **Impact** — closes the traces → lessons → edits → consistency loop that
   every AI team runs manually today; prompt drift across agents stops being a

@@ -33,8 +33,7 @@ flowchart LR
    existing memory. Knowledge, not yet action.
 3. **Apply** — `uberprompt propose` targets each lesson at the prompts it applies
    to (lineage → LLM catalog pass → vector RAG over prompt-purpose embeddings)
-   and files minimal-edit proposals; an eval gate replays real traces
-   pairwise-judged against a golden set. A human approves the diff → version
+   and files minimal-edit proposals. A human approves the diff → version
    bump, immutable snapshot, re-embed.
 4. **Sync ripple** — every bump triggers `uberprompt sync-check`: walk the
    dependency graph for everything that depends on the changed fragment
