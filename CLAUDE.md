@@ -70,7 +70,13 @@ talks to you. It should never be blocked grinding on a long task.
   tool / background tasks) or **Codex** agents. Run independent subtasks in
   parallel, in one message.
 - Anything expected to take more than ~2 minutes of tool-grinding → delegate it and
-  keep the main session responsive for the next instruction.
+  keep the main session responsive for the next instruction. This includes infra
+  chores (DB setup, env wiring, installs) — NOT just feature code.
+- Ready-made subagents live in `.claude/agents/`: **builder** (code → PR),
+  **ops** (infra/DB/env chores), **reviewer** (PR review vs contract). Use them.
+- The main session's job between delegations: answer the human, review results,
+  merge, update docs. If the main session is running a shell loop, it's doing it
+  wrong.
 - Subagents work in their own worktrees/branches; the main session reviews and
   merges their output.
 
