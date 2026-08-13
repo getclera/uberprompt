@@ -60,27 +60,51 @@ export function contentHash(doc) {
   return createHash("sha256").update(JSON.stringify(canon)).digest("hex");
 }
 
-export async function voyageEmbed(env, text) {
+export async function voyageEmbedBatch(env, texts) {
+  if (texts.length === 0) return [];
   const res = await fetch(VOYAGE_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${env.VOYAGE_API_KEY}`,
     },
-    body: JSON.stringify({ model: VOYAGE_MODEL, input: [text] }),
+    body: JSON.stringify({ model: VOYAGE_MODEL, input: texts }),
   });
   if (!res.ok) {
     throw new Error(`voyage embed failed: ${res.status} ${await res.text()}`);
   }
   const body = await res.json();
-  const embedding = body.data?.[0]?.embedding;
-  if (!Array.isArray(embedding)) {
+  const rows = body.data;
+  if (!Array.isArray(rows) || rows.length !== texts.length) {
     throw new Error(
-      `voyage embed returned no embedding: ${JSON.stringify(body).slice(0, 200)}`
+      `voyage embed returned ${rows?.length ?? 0} embeddings for ${texts.length} inputs: ${JSON.stringify(body).slice(0, 200)}`
     );
+  }
+  return rows.sort((a, b) => a.index - b.index).map((r) => r.embedding);
+}
+
+export async function voyageEmbed(env, text) {
+  const [embedding] = await voyageEmbedBatch(env, [text]);
+  if (!Array.isArray(embedding)) {
+    throw new Error("voyage embed returned no embedding");
   }
   return embedding;
 }
+
+export function cosine(a, b) {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export const VOYAGE_EMBED_MODEL = VOYAGE_MODEL;
 
 export async function openaiClient(env) {
   const { default: OpenAI } = await import("openai");
