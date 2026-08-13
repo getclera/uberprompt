@@ -1,14 +1,17 @@
 import { ObjectId } from "mongodb";
-import { closeDb, lessonsCol, loadPrompt, type EvalCase } from "@uberprompt/sdk";
+import { closeDb, lessonsCol, loadPrompt, type EvalCase, type LessonDoc } from "@uberprompt/sdk";
 import { registerUberprompt } from "@uberprompt/tracing";
 import { findCulprit } from "./diagnose";
 import { collectCases, runEval } from "./evals";
 import { authorCandidate } from "./author";
 import { applyLesson } from "./index";
+import { targetPrompts } from "./targeting";
+import { watch } from "./watch";
 import { rubricTotal } from "./types";
 
 function usage(): never {
-  console.error("usage: apply <diagnose|eval|suggest> <lessonId> <promptName>");
+  console.error("usage: apply <target|diagnose|eval|suggest> <lessonId> [promptName]");
+  console.error("       apply watch");
   process.exit(1);
 }
 
@@ -30,19 +33,27 @@ function scorecard(cases: EvalCase[]): string {
   return [header, ...rows].join("\n");
 }
 
-async function loadLesson(lessonId: ObjectId) {
+async function loadLesson(lessonId: ObjectId): Promise<LessonDoc> {
   const lesson = await lessonsCol().findOne({ _id: lessonId });
   if (!lesson) throw new Error(`Lesson not found: ${lessonId.toHexString()}`);
   return lesson;
 }
 
+async function cmdTarget(lessonId: ObjectId): Promise<void> {
+  const hits = await targetPrompts(await loadLesson(lessonId));
+  console.log(`${hits.length} prompt(s) targeted:`);
+  for (const hit of hits) {
+    const score = hit.score === undefined ? "" : ` (${hit.score.toFixed(2)})`;
+    console.log(`  [${hit.rung}]${score} ${hit.prompt} — ${hit.reason}`);
+  }
+}
+
 async function cmdDiagnose(lessonId: ObjectId, promptName: string): Promise<void> {
   const lesson = await loadLesson(lessonId);
-  const doc = await loadPrompt(promptName);
-  const culprit = await findCulprit(lesson, doc);
+  const culprit = await findCulprit(lesson, await loadPrompt(promptName));
   console.log(`fragment:   ${culprit.fragment}`);
   console.log(`span:       "${culprit.span}"`);
-  console.log(`sharedWith: ${culprit.sharedWith.length > 0 ? culprit.sharedWith.join(", ") : "(prompt-local)"}`);
+  console.log(`declared:   ${culprit.sharedWith.length > 0 ? culprit.sharedWith.join(", ") : "(prompt-local)"}`);
   console.log(`traces:     ${culprit.traceIds.length}`);
   console.log(`rationale:  ${culprit.rationale}`);
 }
@@ -78,27 +89,47 @@ async function cmdEval(lessonId: ObjectId, promptName: string): Promise<void> {
   );
 }
 
-async function cmdSuggest(lessonId: ObjectId, promptName: string): Promise<void> {
-  const { proposal, culprit, reports } = await applyLesson(lessonId, promptName);
-  const last = reports[reports.length - 1];
-  if (last) console.log(scorecard(last.cases));
-  console.log(`\nstatus:   ${proposal.status.toUpperCase()} after ${reports.length} attempt(s)`);
-  console.log(`culprit:  ${culprit.fragment} -> "${culprit.span}"`);
-  console.log(`shared:   ${culprit.sharedWith.length > 0 ? culprit.sharedWith.join(", ") : "(prompt-local)"}`);
-  console.log(`proposal: ${proposal._id?.toHexString() ?? "(unsaved)"}`);
-  console.log(`\nOLD:\n${proposal.oldText}\n\nNEW:\n${proposal.newText}`);
+async function cmdSuggest(lessonId: ObjectId, promptName?: string): Promise<void> {
+  const result = await applyLesson(lessonId, promptName ? { only: promptName } : {});
+  console.log(`targets: ${result.targets.map((t) => `${t.prompt}[${t.rung}]`).join(", ")}\n`);
+  for (const outcome of result.outcomes) {
+    const last = outcome.reports[outcome.reports.length - 1];
+    console.log(`=== ${outcome.prompt} — ${outcome.status.toUpperCase()} ===`);
+    if (outcome.culprit) {
+      console.log(`culprit: ${outcome.culprit.fragment} -> "${outcome.culprit.span}"`);
+      console.log(
+        `declared: ${outcome.culprit.sharedWith.length > 0 ? outcome.culprit.sharedWith.join(", ") : "(prompt-local)"}`,
+      );
+    }
+    if (last) console.log(scorecard(last.cases));
+    console.log(`reason: ${outcome.reason}`);
+    if (outcome.proposalId) console.log(`proposal: ${outcome.proposalId.toHexString()}`);
+    console.log();
+  }
 }
 
 async function main(): Promise<void> {
   const [command, lessonArg, promptName] = process.argv.slice(2);
-  if (!command || !lessonArg || !promptName) usage();
+  if (!command) usage();
+  if (command === "watch") {
+    const stop = await watch();
+    process.on("SIGINT", () => {
+      void stop().then(() => process.exit(0));
+    });
+    return;
+  }
+  if (!lessonArg) usage();
   const lessonId = new ObjectId(lessonArg);
-  if (command === "diagnose") await cmdDiagnose(lessonId, promptName);
-  else if (command === "eval") await cmdEval(lessonId, promptName);
+  if (command === "target") await cmdTarget(lessonId);
   else if (command === "suggest") await cmdSuggest(lessonId, promptName);
-  else usage();
+  else if (command === "diagnose" || command === "eval") {
+    if (!promptName) usage();
+    if (command === "diagnose") await cmdDiagnose(lessonId, promptName);
+    else await cmdEval(lessonId, promptName);
+  } else usage();
 }
 
+const isWatch = process.argv[2] === "watch";
 const tracing = registerUberprompt({ service: "uberprompt-agent" });
 
 main()
@@ -107,6 +138,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    if (isWatch) return;
     await tracing.shutdown();
     await closeDb();
   });

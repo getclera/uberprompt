@@ -35,6 +35,12 @@ export interface Culprit {
   traceIds: ObjectId[];
   sharedWith: string[];
   rationale: string;
+  undeclared?: Array<{
+    prompt: string;
+    fragment: string;
+    score: number;
+    kind: "semantic" | "literal";
+  }>;
 }
 
 export interface EvalReport {

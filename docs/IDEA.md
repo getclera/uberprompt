@@ -305,6 +305,11 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
   stage 3 consumes new lessons and stamps `processedAt` after filing proposals.
   `processedAt` is stamped whether the eval gate passed or rejected — a lesson is
   processed once, and the outcome lives on its proposals.
+  Trigger: `apply watch` tails a **change stream** on `lessons` and persists the
+  **resume token**, so a restart continues from the last lesson it saw instead of
+  replaying or skipping. On boot it also drains the backlog (`status: "active"`,
+  no `processedAt`), which covers lessons written while it was down. That is the
+  no-cold-start property, made concrete.
 - Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
   `descriptions_embedding` (function-level match, not literal text).
 - Dependency interface (fragment-level, used by stage 4):

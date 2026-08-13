@@ -111,7 +111,7 @@ function failedCase(
   };
 }
 
-function summarize(cases: EvalCase[]): EvalRunSummary {
+export function summarizeCases(cases: EvalCase[]): EvalRunSummary {
   const replays = cases.filter((c) => c.kind === "replay");
   const replayWins = replays.filter((c) => c.verdict === "win").length;
   const replayLosses = replays.filter((c) => c.verdict === "loss").length;
@@ -125,11 +125,13 @@ function summarize(cases: EvalCase[]): EvalRunSummary {
           (sum, c) => sum + RUBRIC_AXES.reduce((s, axis) => s + (pick(c)[axis] ?? 0), 0),
           0,
         ) / cases.length;
+  const goldens = cases.filter((c) => c.kind === "golden");
+  const goldenWins = goldens.filter((c) => c.verdict === "win").length;
+  const clean = goldenRegressions === 0 && replayLosses === 0;
   const passed =
-    goldenRegressions === 0 &&
-    replayLosses === 0 &&
-    replayWins >= Math.ceil(replays.length / 2) &&
-    replayWins >= 1;
+    replays.length > 0
+      ? clean && replayWins >= Math.ceil(replays.length / 2) && replayWins >= 1
+      : clean && goldens.length > 0 && goldenWins >= 1;
   return {
     replayWins,
     replayLosses,
@@ -181,7 +183,7 @@ export async function runEval(args: RunEvalArgs): Promise<EvalReport> {
   );
   return {
     cases: results,
-    summary: summarize(results),
+    summary: summarizeCases(results),
     judgeModel: REASONING_MODEL,
     genModel: GENERATION_MODEL,
   };

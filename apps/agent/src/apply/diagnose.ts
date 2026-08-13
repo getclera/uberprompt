@@ -1,9 +1,28 @@
 import type { ObjectId } from "mongodb";
-import { getDependents, tracesCol, type LessonDoc, type PromptDoc, type TraceDoc } from "@uberprompt/sdk";
+import {
+  findLiteralMatches,
+  findRelatedFragments,
+  findSimilarFragments,
+  getDependents,
+  tracesCol,
+  type FragmentHit,
+  type LessonDoc,
+  type PromptDoc,
+  type TraceDoc,
+} from "@uberprompt/sdk";
 import { callJson } from "../llm";
 import type { Culprit } from "./types";
 
 const MAX_EXAMPLES = 3;
+const MAX_UNDECLARED = 10;
+
+export type UndeclaredHit = NonNullable<Culprit["undeclared"]>[number];
+
+export interface RelatedRow {
+  name: string;
+  fragments: Array<{ key: string; text: string }>;
+  score: number;
+}
 
 const CULPRIT_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -26,6 +45,9 @@ export interface DiagnoseDeps {
   callJson: <T>(prompt: string, schema: Record<string, unknown>) => Promise<T>;
   fetchTraces: (ids: ObjectId[]) => Promise<TraceDoc[]>;
   fetchSharedWith: (fragmentKey: string) => Promise<string[]>;
+  fetchRelated: (span: string, excludePrompt: string) => Promise<RelatedRow[]>;
+  fetchSimilar: (span: string, excludePrompt: string) => Promise<FragmentHit[]>;
+  fetchLiteral: (span: string, excludePrompt: string) => Promise<FragmentHit[]>;
 }
 
 function defaultDeps(): DiagnoseDeps {
@@ -40,6 +62,12 @@ function defaultDeps(): DiagnoseDeps {
       const hits = await getDependents({ fragment: fragmentKey });
       return hits.map((hit) => hit.prompt);
     },
+    fetchRelated: (span, excludePrompt) =>
+      findRelatedFragments(span, { excludePrompt, limit: MAX_UNDECLARED }),
+    fetchSimilar: (span, excludePrompt) =>
+      findSimilarFragments(span, { excludePrompt, limit: MAX_UNDECLARED }),
+    fetchLiteral: (span, excludePrompt) =>
+      findLiteralMatches(span, { excludePrompt, limit: MAX_UNDECLARED }),
   };
 }
 
@@ -81,15 +109,104 @@ function buildPrompt(
   return sections.join("\n\n");
 }
 
+export function normalizeFragmentKey(key: string): string {
+  return key.trim().replace(/^\[+/, "").replace(/\]+$/, "").trim();
+}
+
 function validate(response: CulpritResponse, doc: PromptDoc): string | undefined {
+  response.fragment = normalizeFragmentKey(response.fragment);
   const fragment = doc.fragments.find((f) => f.key === response.fragment);
   if (!fragment) {
-    return `fragment "${response.fragment}" does not exist on prompt "${doc.name}".`;
+    const keys = doc.fragments.map((f) => f.key).join(", ");
+    return `fragment "${response.fragment}" does not exist on prompt "${doc.name}". Valid keys are: ${keys}.`;
   }
   if (!fragment.text.includes(response.span)) {
     return `span is not a verbatim substring of fragment "${response.fragment}".`;
   }
   return undefined;
+}
+
+function isRankFusionVersionGate(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("$rankFusion");
+}
+
+function wordOverlap(span: string, text: string): number {
+  const spanWords = new Set(span.toLowerCase().split(/\W+/).filter(Boolean));
+  return text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((word) => spanWords.has(word)).length;
+}
+
+function fusedRowToHit(row: RelatedRow, span: string): UndeclaredHit | undefined {
+  const needle = span.toLowerCase();
+  const literal = row.fragments.find((f) => f.text.toLowerCase().includes(needle));
+  if (literal) {
+    return { prompt: row.name, fragment: literal.key, score: row.score, kind: "literal" };
+  }
+  let best: { key: string } | undefined;
+  let bestOverlap = -1;
+  for (const fragment of row.fragments) {
+    const overlap = wordOverlap(span, fragment.text);
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      best = fragment;
+    }
+  }
+  return best
+    ? { prompt: row.name, fragment: best.key, score: row.score, kind: "semantic" }
+    : undefined;
+}
+
+function mergeFallbackHits(literal: FragmentHit[], similar: FragmentHit[]): UndeclaredHit[] {
+  const merged = new Map<string, UndeclaredHit>();
+  for (const hit of literal) {
+    merged.set(`${hit.prompt}\u0000${hit.fragment}`, {
+      prompt: hit.prompt,
+      fragment: hit.fragment,
+      score: hit.score,
+      kind: "literal",
+    });
+  }
+  for (const hit of similar) {
+    const key = `${hit.prompt}\u0000${hit.fragment}`;
+    if (!merged.has(key)) {
+      merged.set(key, { prompt: hit.prompt, fragment: hit.fragment, score: hit.score, kind: "semantic" });
+    }
+  }
+  return [...merged.values()];
+}
+
+async function findUndeclared(
+  deps: DiagnoseDeps,
+  span: string,
+  promptName: string,
+  sharedWith: string[],
+): Promise<UndeclaredHit[]> {
+  const excluded = new Set([promptName, ...sharedWith]);
+  let hits: UndeclaredHit[];
+  try {
+    const rows = await deps.fetchRelated(span, promptName);
+    hits = rows.flatMap((row) => {
+      const hit = fusedRowToHit(row, span);
+      return hit ? [hit] : [];
+    });
+    console.log(`[diagnose] undeclared radius via $rankFusion (${hits.length} raw hit(s))`);
+  } catch (error) {
+    if (!isRankFusionVersionGate(error)) throw error;
+    const [literal, similar] = await Promise.all([
+      deps.fetchLiteral(span, promptName),
+      deps.fetchSimilar(span, promptName),
+    ]);
+    hits = mergeFallbackHits(literal, similar);
+    console.log(
+      `[diagnose] undeclared radius via FALLBACK vector+literal merge, $rankFusion unavailable (${hits.length} raw hit(s))`,
+    );
+  }
+  return hits
+    .filter((hit) => !excluded.has(hit.prompt))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_UNDECLARED);
 }
 
 export async function findCulprit(
@@ -119,6 +236,7 @@ export async function findCulprit(
   const dependents = await deps.fetchSharedWith(response.fragment);
   const sharedWith = [...new Set(dependents.filter((name) => name !== doc.name))];
   const traceIds = traces.flatMap((t) => (t._id ? [t._id] : []));
+  const undeclared = await findUndeclared(deps, response.span, doc.name, sharedWith);
 
   return {
     fragment: response.fragment,
@@ -126,5 +244,6 @@ export async function findCulprit(
     rationale: response.rationale,
     sharedWith,
     traceIds,
+    undeclared,
   };
 }
