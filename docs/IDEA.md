@@ -42,21 +42,13 @@ the version bump happens on approval.
 3. **RAG**: vector search of the lesson embedding over embedded *purpose
    descriptions* (`descriptions_embedding`), not literal prompt text — decided
    IN scope, it's cheap.
-4. **Culprit**: within each targeted prompt, which *fragment* is at fault and which
-   exact *span* of its text causes the failure. Rungs 1–3 answer "which prompts";
-   this answers "which words". The span is quoted verbatim and validated as a real
-   substring, so the proposal can point at the bad actor rather than just describe
-   it. The culprit fragment may be shared, so its blast radius (other prompts using
-   it, via `edges`) is recorded alongside.
+**Benched (good ideas, not today's scope — from PR #8/#32):** culprit rung
+(fragment+span-level fault localization with blast radius) and the eval gate
+(pairwise-judged replay + golden-set scoring before a proposal surfaces, with the
+`"evaluating"` status). Layer onto the approve path if un-benched.
 
-**Eval gate.** A proposal is only surfaced if its candidate text is measurably
-better than what it replaces. Each candidate is scored against the live fragment on
-(a) replayed inputs from the failing traces that produced the lesson and (b) a
-curated golden set per prompt, both judged pairwise by an LLM on a fixed rubric.
-Hard gate: zero golden regressions, no replay losses, at least half the replay
-cases won. A failing candidate gets one revision attempt with the judge's critique
-fed back; if it fails again the proposal is stored `rejected` with its eval report
-and never surfaced. Evals are headless — the scorecard rides on the proposal.
+**Stage 3→4 handoff:** approve's version bump is the trigger; Felix's dependency
+check (stage 4) consumes it (change-stream or explicit invoke — Felix's call).
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
@@ -87,6 +79,60 @@ edges (documents), traces (documents), lessons = agent memory (documents +
 **Atlas Vector Search** over Voyage embeddings), and **change streams** as the event
 bus that wakes the agent. The DB *is* the agent's memory and nervous system.
 
+### MongoDB features we leverage (beyond basic documents + vector search)
+
+1. **Compound vector search filters** — vector indexes on `lessons` and `prompts`
+   include `filter` fields (`status`, `appliesTo`) so stage 3 RAG searches only
+   active lessons and can scope by prompt name. Array-of-string filter fields do
+   element-match.
+
+2. **$jsonSchema validators** — every collection gets `validationLevel: "strict"`,
+   `validationAction: "error"` at creation time. Enforces required fields, bsonType,
+   enum constraints (e.g. `status: enum ["ok","error"]` on spans). Catches bad
+   inserts immediately — aligns with "error loudly" rule.
+
+3. **TTL indexes** — auto-expire telemetry: spans 30d (`ingestedAt`), traces 90d
+   (`ts`). Never TTL lessons (durable memory, lifecycle via `status` field).
+
+4. **Aggregation pipeline for dashboard analytics:**
+   - `$facet` — single query powering multiple dashboard panels (latency
+     percentiles, error rates, token usage by prompt).
+   - `$densify` + `$fill` — zero-filled time series for charts, no client-side
+     gap-patching.
+   - `$setWindowFields` — rolling 1h avg latency per prompt, moving error rate
+     over trailing N traces.
+   - `$bucket` — latency distribution histograms.
+   - `$percentile` (approximate) — p50/p95/p99 latency in one pass.
+
+5. **`$graphLookup`** — recursive traversal of `edges` collection for stage 4
+   transitive dependent discovery. Cycle detection is native (no special code).
+   `depthField` maps to sync-check "shrinking waves". Caveat: `$vectorSearch`
+   cannot nest inside `$graphLookup` — declared + undeclared dependent discovery
+   stays two separate queries composed in app code.
+
+6. **Change streams (resumable)** — resume tokens persisted in a `sync_state`
+   collection (stays "one platform"). Use `startAfter` (not `resumeAfter` —
+   survives invalidate events). Watch `prompt_versions` inserts for stage 4
+   trigger. Pipeline filtering projects only needed fields to stay under 16MB
+   event limit.
+
+7. **Wildcard indexes** on `spans.attributes` and `spans.resource` — supports
+   ad-hoc queries on arbitrary OTel attributes. Prerequisite: sanitize dotted
+   OTel keys (e.g. `gen_ai.request.model`) to `gen_ai__request__model` at ingest
+   time — MongoDB parses dots as nested path traversal.
+
+8. **Materialized views via `$merge`** — spans→traces rollup (`on: "traceId"`,
+   `whenMatched: "replace"`). Second view: per-prompt daily error rates into
+   `prompt_error_rates_daily`.
+
+### If time allows
+
+- **Atlas Search + `$rankFusion`** — full-text search indexes on prompt
+  fragments, lesson text, and trace outputs. `$rankFusion` (GA on Atlas 8.0+)
+  fuses text + vector results via reciprocal rank fusion — upgrades stage 2
+  lesson dedup (catches near-duplicates sharing terms but embedding differently)
+  and powers a dashboard search bar.
+
 ## Data model — THE CONTRACT (edit here first, then code)
 
 Database `uberprompt`, collections:
@@ -102,8 +148,11 @@ Database `uberprompt`, collections:
 
 // prompt_versions — immutable, append-only snapshots
 // (same shape + { promptName, frozenAt, contentHash })
-// contentHash = sha256 of { template, fragments:[{key,text}] } — version identity is
-// deterministic, so re-running definePrompt with unchanged text never bumps a version.
+// contentHash = sha256 of { template, fragments:[{key,text}] }, fragments sorted by key
+// so the hash tracks content, not the caller's iteration order. Version identity is
+// deterministic: re-running definePrompt with unchanged text never bumps a version, and
+// takes an early return that skips the description + embedding API calls entirely.
+// Legacy docs written before this get their hash backfilled in place, without a bump.
 
 // edges — dependency graph; fragment-only endpoint = shared fragment
 // (matches apps/demo/edges.json + expected-semantic-edges.json)

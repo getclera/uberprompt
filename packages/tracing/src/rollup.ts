@@ -16,6 +16,10 @@ const BOUND_SPAN = {
   $first: { $filter: { input: "$spans", cond: { $ne: [{ $ifNull: ["$$this.prompt", null] }, null] } } },
 };
 
+const WITH_PROVIDER = {
+  $first: { $filter: { input: "$spans", cond: { $ne: [{ $ifNull: ["$$this.genAi.provider", null] }, null] } } },
+};
+
 const WITH_INPUT = {
   $first: { $filter: { input: "$spans", cond: { $ne: [{ $ifNull: ["$$this.input", null] }, null] } } },
 };
@@ -61,7 +65,16 @@ export function rollupPipeline(traceIds: string[]): Document[] {
         },
       },
     },
-    { $set: { root: ROOT, llm: LLM_SPAN, bound: BOUND_SPAN, withInput: WITH_INPUT, withOutput: WITH_OUTPUT } },
+    {
+      $set: {
+        root: ROOT,
+        llm: LLM_SPAN,
+        bound: BOUND_SPAN,
+        provider: WITH_PROVIDER,
+        withInput: WITH_INPUT,
+        withOutput: WITH_OUTPUT,
+      },
+    },
     {
       $set: {
         inputTokens: rootUsageOrChildren("inputTokens", "$childInputTokens"),
@@ -87,7 +100,7 @@ export function rollupPipeline(traceIds: string[]): Document[] {
         input: { $ifNull: ["$withInput.input", null] },
         output: { $ifNull: ["$withOutput.output", ""] },
         meta: {
-          provider: { $ifNull: ["$llm.genAi.provider", "$$REMOVE"] },
+          provider: { $ifNull: ["$llm.genAi.provider", "$provider.genAi.provider", "$$REMOVE"] },
           model: { $ifNull: ["$llm.genAi.responseModel", "$llm.genAi.requestModel", "unknown"] },
           latencyMs: { $ifNull: ["$root.durationMs", 0] },
           tokens: {

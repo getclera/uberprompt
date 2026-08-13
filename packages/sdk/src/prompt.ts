@@ -1,5 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { createHash } from "node:crypto";
 import { edgesCol, promptsCol, promptVersionsCol } from "./db";
 import { embed, embedMany } from "./embeddings";
 import type { EdgeEndpoint, PromptDoc, PromptFragment } from "./types";
@@ -44,6 +45,18 @@ function fragmentsChanged(a: PromptFragment[], b: PromptFragment[]): boolean {
   return JSON.stringify(strip(a)) !== JSON.stringify(strip(b));
 }
 
+// Version identity. Fragments are sorted by key so that the hash depends on prompt
+// content only, not on the iteration order the caller happened to build them in.
+export function computePromptContentHash(template: string, fragments: PromptFragment[]): string {
+  const canonical = JSON.stringify({
+    template,
+    fragments: fragments
+      .map((f) => ({ key: f.key, text: f.text }))
+      .sort((a, b) => a.key.localeCompare(b.key)),
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
 async function embedFragments(fragments: PromptFragment[]): Promise<PromptFragment[]> {
   const nonEmpty = fragments.filter((f) => f.text.length > 0);
   const vectors = await embedMany(nonEmpty.map((f) => f.text));
@@ -68,12 +81,24 @@ export async function definePrompt(args: DefinePromptArgs): Promise<PromptDoc> {
   }));
 
   const existing = await promptsCol().findOne({ name });
+  const contentHash = computePromptContentHash(template, fragments);
   const changed =
-    !existing || existing.template !== template || fragmentsChanged(existing.fragments, fragments);
+    !existing ||
+    (existing.contentHash !== undefined
+      ? existing.contentHash !== contentHash
+      : existing.template !== template || fragmentsChanged(existing.fragments, fragments));
 
   let doc: PromptDoc;
   if (!changed) {
     doc = existing;
+    if (existing.contentHash === undefined) {
+      await promptsCol().updateOne({ name }, { $set: { contentHash } });
+      await promptVersionsCol().updateOne(
+        { promptName: name, version: existing.version },
+        { $set: { contentHash } },
+      );
+      doc = { ...existing, contentHash };
+    }
   } else {
     const description = args.description ?? (await generateDescription(name, template, fragments));
     doc = {
@@ -83,6 +108,7 @@ export async function definePrompt(args: DefinePromptArgs): Promise<PromptDoc> {
       descriptionEmbedding: await embed(description),
       fragments: await embedFragments(fragments),
       template,
+      contentHash,
       updatedAt: new Date(),
       updatedBy,
     };

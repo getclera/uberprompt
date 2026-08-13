@@ -13,6 +13,7 @@
     "smoke": "tsx --env-file=../../.env scripts/smoke.ts",
     "smoke:otlp": "tsx --env-file=../../.env scripts/smoke-otlp.ts",
     "smoke:live": "tsx --env-file=../../.env scripts/smoke-live.ts",
+    "smoke:protobuf": "tsx --env-file=../../.env scripts/smoke-protobuf.ts",
     "smoke:stream-error": "tsx --env-file=../../.env scripts/smoke-stream-error.ts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@ai-sdk/openai": "^4.0.41",
     "@ai-sdk/provider": "^4.0.7",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
     "@types/node": "^22.15.0",
     "tsx": "^4.20.0",
     "typescript": "^5.6.0",
