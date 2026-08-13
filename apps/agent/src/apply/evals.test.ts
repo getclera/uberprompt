@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { EvalCase, PromptDoc } from "@uberprompt/sdk";
-import { loadGolden, runEval, type RunEvalArgs } from "./evals";
-import { RUBRIC_AXES, type EvalCaseSpec } from "./types";
+import { loadGolden, runEval, summarizeCases, type RunEvalArgs } from "./evals";
+import { RUBRIC_AXES, WIN_AXES, type EvalCaseSpec } from "./types";
 
 const doc: PromptDoc = {
-  name: "billing-agent",
+  name: "refund-agent",
   version: 1,
   description: "test",
   fragments: [
@@ -56,7 +56,7 @@ function stubScore(
       candidateOutput,
       baseline,
       candidate,
-      delta: (candidateScore - 3) * RUBRIC_AXES.length,
+      delta: (candidateScore - 3) * WIN_AXES.length,
       verdict,
       critique: "stub",
     };
@@ -78,11 +78,11 @@ function baseArgs(cases: EvalCaseSpec[]): RunEvalArgs {
   };
 }
 
-test("loadGolden loads the real billing-agent golden set from the repo root", async () => {
-  const cases = await loadGolden("billing-agent");
+test("loadGolden loads the real refund-agent golden set from the repo root", async () => {
+  const cases = await loadGolden("refund-agent");
   assert.equal(cases.length, 3);
   const ids = cases.map((c) => c.id);
-  assert.ok(ids.includes("in-policy-refund-still-helps"));
+  assert.ok(ids.includes("in-policy-credit-still-helps"));
   for (const goldenCase of cases) {
     assert.equal(typeof goldenCase.intent, "string");
     assert.ok(goldenCase.intent.length > 0);
@@ -133,12 +133,19 @@ test("runEval fails when a golden case regresses despite replay wins", async () 
   assert.equal(report.summary.passed, false);
 });
 
-test("runEval fails closed with zero replay cases", async () => {
+test("with no replay cases, a golden win carries the candidate", async () => {
   const args = baseArgs([goldenSpec("g1"), goldenSpec("g2")]);
   args.score = stubScore({ "golden:g1": "tie", "golden:g2": "win" });
   const report = await runEval(args);
   assert.equal(report.summary.replayWins, 0);
   assert.equal(report.summary.goldenRegressions, 0);
+  assert.equal(report.summary.passed, true);
+});
+
+test("with no replay cases and no golden win, nothing carries the candidate", async () => {
+  const args = baseArgs([goldenSpec("g1"), goldenSpec("g2")]);
+  args.score = stubScore({ "golden:g1": "tie", "golden:g2": "tie" });
+  const report = await runEval(args);
   assert.equal(report.summary.passed, false);
 });
 
@@ -158,7 +165,7 @@ test("runEval fails on any replay loss", async () => {
   assert.equal(report.summary.passed, false);
 });
 
-test("runEval counts a single judge failure as a loss", async () => {
+test("an unjudgeable case counts as a tie, not as evidence against the candidate", async () => {
   const winScore = stubScore({ "replay:r1": "win", "replay:r2": "win" });
   const args = baseArgs([replaySpec("r1"), replaySpec("r2"), replaySpec("r3")]);
   args.score = (spec, baselineOutput, candidateOutput, lessonText) =>
@@ -168,14 +175,120 @@ test("runEval counts a single judge failure as a loss", async () => {
   const report = await runEval(args);
   const failed = report.cases.find((c) => c.caseId === "replay:r3");
   assert.ok(failed);
-  assert.equal(failed.verdict, "loss");
+  assert.equal(failed.verdict, "tie");
   assert.match(failed.critique, /judge exploded/);
-  assert.equal(report.summary.replayLosses, 1);
-  assert.equal(report.summary.passed, false);
+  assert.equal(report.summary.replayLosses, 0);
+  assert.equal(report.summary.passed, true);
+});
+
+test("an unjudged case does not drag the reported averages", async () => {
+  const winScore = stubScore({ "replay:r1": "win", "replay:r2": "win" });
+  const args = baseArgs([replaySpec("r1"), replaySpec("r2"), replaySpec("r3")]);
+  args.score = (spec, baselineOutput, candidateOutput, lessonText) =>
+    spec.caseId === "replay:r3"
+      ? Promise.reject(new Error("judge exploded"))
+      : winScore(spec, baselineOutput, candidateOutput, lessonText);
+  const report = await runEval(args);
+  assert.equal(report.summary.baselineAvg, 3 * RUBRIC_AXES.length);
+  assert.equal(report.summary.candidateAvg, 4 * RUBRIC_AXES.length);
+});
+
+test("a transient judge error is retried once before the case is written off", async () => {
+  const winScore = stubScore({ "replay:r1": "win" });
+  const args = baseArgs([replaySpec("r1")]);
+  let calls = 0;
+  args.score = (spec, baselineOutput, candidateOutput, lessonText) => {
+    calls += 1;
+    return calls === 1
+      ? Promise.reject(new Error("transient"))
+      : winScore(spec, baselineOutput, candidateOutput, lessonText);
+  };
+  const report = await runEval(args);
+  assert.equal(calls, 2);
+  assert.equal(report.cases[0]?.verdict, "win");
+});
+
+test("baseline outputs are reused across attempts so the judge compares against a fixed baseline", async () => {
+  const cases = [replaySpec("r1"), replaySpec("r2")];
+  const first = baseArgs(cases);
+  first.score = stubScore({ "replay:r1": "win", "replay:r2": "win" });
+  const firstReport = await runEval(first);
+
+  const systems: string[] = [];
+  const second = baseArgs(cases);
+  second.score = stubScore({ "replay:r1": "win", "replay:r2": "win" });
+  second.baselineOutputs = firstReport.baselineOutputs;
+  second.gen = (system, user) => {
+    systems.push(system);
+    return stubGen(system, user);
+  };
+  const secondReport = await runEval(second);
+
+  assert.equal(systems.length, cases.length);
+  assert.ok(systems.every((s) => s.includes("CANDIDATE")));
+  assert.deepEqual(secondReport.baselineOutputs, firstReport.baselineOutputs);
 });
 
 test("runEval aborts when two judge calls fail", async () => {
   const args = baseArgs([replaySpec("r1"), replaySpec("r2"), replaySpec("r3")]);
   args.score = () => Promise.reject(new Error("judge exploded"));
   await assert.rejects(() => runEval(args), /aborted/);
+});
+
+function judged(caseId: string, kind: "replay" | "golden", verdict: "win" | "tie" | "loss"): EvalCase {
+  const score = verdict === "win" ? 5 : verdict === "loss" ? 1 : 3;
+  const rubric = Object.fromEntries(RUBRIC_AXES.map((a) => [a, 3]));
+  return {
+    caseId,
+    kind,
+    input: {},
+    baselineOutput: "b",
+    candidateOutput: "c",
+    baseline: rubric,
+    candidate: Object.fromEntries(RUBRIC_AXES.map((a) => [a, score])),
+    delta: (score - 3) * WIN_AXES.length,
+    verdict,
+    critique: "x",
+  };
+}
+
+test("a catalog-targeted prompt passes on golden evidence when it has no replay cases", () => {
+  const cases = [
+    judged("golden:a", "golden", "win"),
+    judged("golden:b", "golden", "win"),
+  ];
+  assert.equal(summarizeCases(cases).passed, true);
+});
+
+test("golden ties alone are not enough to pass without replay evidence", () => {
+  const cases = [judged("golden:a", "golden", "tie"), judged("golden:b", "golden", "tie")];
+  assert.equal(summarizeCases(cases).passed, false);
+});
+
+test("a single golden win among many ties does not carry a replay-less prompt", () => {
+  const cases = [
+    judged("golden:a", "golden", "win"),
+    judged("golden:b", "golden", "tie"),
+    judged("golden:c", "golden", "tie"),
+    judged("golden:d", "golden", "tie"),
+  ];
+  assert.equal(summarizeCases(cases).passed, false);
+});
+
+test("a golden majority carries a replay-less prompt", () => {
+  const cases = [
+    judged("golden:a", "golden", "win"),
+    judged("golden:b", "golden", "win"),
+    judged("golden:c", "golden", "tie"),
+  ];
+  assert.equal(summarizeCases(cases).passed, true);
+});
+
+test("a golden regression still fails a replay-less prompt", () => {
+  const cases = [judged("golden:a", "golden", "win"), judged("golden:b", "golden", "loss")];
+  assert.equal(summarizeCases(cases).passed, false);
+});
+
+test("no cases at all still fails closed", () => {
+  assert.equal(summarizeCases([]).passed, false);
 });

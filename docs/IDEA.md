@@ -42,18 +42,28 @@ the version bump happens on approval.
 3. **RAG**: vector search of the lesson embedding over embedded *purpose
    descriptions* (`descriptions_embedding`), not literal prompt text — decided
    IN scope, it's cheap.
-**Benched (good ideas, not today's scope — from PR #8/#32):** culprit rung
-(fragment+span-level fault localization with blast radius) and the eval gate
-(pairwise-judged replay + golden-set scoring before a proposal surfaces, with the
-`"evaluating"` status). Layer onto the approve path if un-benched.
+**Un-benched and shipped:** the culprit rung (fragment+span fault localization with
+declared + undeclared blast radius) and the eval gate (pairwise-judged replay +
+golden-set scoring behind the `"evaluating"` status) both run in stage 3 today.
+
+**Eval gate scoring:** the judge scores four axes 1–5, but only **taskFit, tone,
+specificity** sum into the win/loss delta (`WIN_AXES`). `lessonAdherence` is
+recorded and reported as a diagnostic only — a candidate that merely parrots the
+lesson without getting better must not clear the gate.
+
+**Approve has exactly one implementation** — `approveProposal` in
+`packages/sdk/src/prompt.ts` (version bump + `contentHash` + re-embed + new-version
+`prompt_versions` snapshot + `status: "applied"`, all in one transaction).
+`uberprompt approve` bridges to it via `packages/sdk/scripts/approve.ts`; the old
+duplicate logic in `packages/cli/src/review.mjs` is gone.
 
 **Stage 3→4 handoff (DECIDED, shipped):** stage 4 is a function call, not a
-watcher — `approve` (and `rollback`) invoke `runSyncCheck(prompt, fragment,
-newText)` inline after the version bump (both write pre- AND post-change
-`prompt_versions` snapshots, so history is complete and the diff signal always
-exists). `uberprompt sync <prompt[.fragment]>` reruns it manually for a bump
-that happened without one. Change streams remain optional dashboard sugar, not
-a dependency of the loop.
+watcher — after a successful approve bridge (and after `rollback`), the CLI
+invokes `runSyncCheck(prompt, fragment, newText)` inline (`--no-sync` opts
+out). `uberprompt sync <prompt[.fragment]>` reruns it manually for a bump that
+happened without one; it diffs current against the latest snapshot with
+`version < current`. Change streams remain optional dashboard sugar, not a
+dependency of the loop.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
@@ -227,7 +237,8 @@ Database `uberprompt`, collections:
   candidateText: string,
   cases: [{ caseId: string, kind: "replay" | "golden",
             input: object, baselineOutput: string, candidateOutput: string,
-            baseline: Rubric, candidate: Rubric,   // Rubric = 4 axes, 1-5 each
+            baseline: Rubric, candidate: Rubric,   // Rubric = 4 axes, 1-5 each;
+            // delta sums WIN_AXES only (taskFit+tone+specificity), lessonAdherence is diagnostic
             delta: number, verdict: "win" | "tie" | "loss", critique: string }],
   summary: { replayWins: number, replayLosses: number, goldenRegressions: number,
              baselineAvg: number, candidateAvg: number, passed: boolean },
@@ -318,6 +329,11 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
   stage 3 consumes new lessons and stamps `processedAt` after filing proposals.
   `processedAt` is stamped whether the eval gate passed or rejected — a lesson is
   processed once, and the outcome lives on its proposals.
+  Trigger: `apply watch` tails a **change stream** on `lessons` and persists the
+  **resume token**, so a restart continues from the last lesson it saw instead of
+  replaying or skipping. On boot it also drains the backlog (`status: "active"`,
+  no `processedAt`), which covers lessons written while it was down. That is the
+  no-cold-start property, made concrete.
 - Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
   `descriptions_embedding` (function-level match, not literal text).
 - Dependency interface (fragment-level, used by stage 4):
@@ -333,7 +349,25 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
 `apps/demo` are seed fixtures only — they bootstrap the DB and never receive
 write-back; after seeding, `prompts`/`prompt_versions`/`edges` in Mongo are
 the single runtime source of truth (approve/rollback/sync mutate Mongo only,
-so the files go stale by design):
+so the files go stale by design).
+
+The demo crew is **Mango Republic**, a mango wholesaler selling crates/pallets to
+supermarkets, juice factories, and restaurants. Six prompts:
+
+| Prompt | Job | Shared `uses` |
+|---|---|---|
+| `triage-router` | Classifies inbound into `order \| refund \| quality \| escalation`, JSON out | output-format |
+| `order-agent` | New orders, reorders, pallet pricing, delivery slots | brand-voice, output-format |
+| `refund-agent` | Credit notes / refunds for bad shipments | brand-voice, refund-policy, output-format |
+| `quality-agent` | Quality complaints (overripe, cold-chain, wrong grade), ripening advice | brand-voice, output-format |
+| `escalation-writer` | Internal escalation summaries for the sales director | brand-voice, escalation-criteria, output-format |
+| `satisfaction-summarizer` | Summarizes resolved conversations + sentiment | output-format |
+
+Planted undeclared semantic deps (what stage 4 must infer): `triage-router`'s
+local `routing-rules` paraphrases escalation-criteria (incl. the $50k/year churn
+threshold); `escalation-writer`'s local `context` restates refund-policy.
+
+The seed fixture files:
 
 - `apps/demo/fragments/<key>.json` — `{ key, version, text }`; shared fragments,
   canonical (brand-voice, refund-policy, escalation-criteria, output-format).
@@ -363,10 +397,10 @@ A local fragment with empty `text` is a **runtime input slot** (`{{ticket}}`,
 
 ## Demo script (~4 min)
 
-1. Prompt graph in the dashboard — 5 support prompts (Acme Cloud), shared fragments, edges.
+1. Prompt graph in the dashboard — 6 support prompts (Mango Republic, a mango wholesaler), shared fragments, edges.
 2. Run the demo app → **stage 1**: traces stream in, some seeded failures.
-3. Hit analyze → **stage 2**: agent writes a lesson ("never promise a refund
-   amount before checking the account").
+3. Hit analyze → **stage 2**: agent writes a lesson ("never promise a credit
+   amount before checking the delivery record").
 4. **Stage 3**: lesson becomes a proposal; approve the diff → new prompt version.
 5. **Stage 4**: sync check ripples through the graph, files consistency proposals
    for dependent prompts; approve → graph goes quiet. Rerun app → better output.

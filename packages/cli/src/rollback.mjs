@@ -1,6 +1,40 @@
+import { createHash } from "node:crypto";
 import { loadEnv, requireEnv, connect, voyageEmbedBatch } from "./store.mjs";
-import { snapshotVersion } from "./review.mjs";
-import { diffFragments } from "./sync.mjs";
+import { diffFragments } from "./sync-check.mjs";
+
+function contentHash(doc, sorted) {
+  const fragments = doc.fragments.map((f) => ({ key: f.key, text: f.text }));
+  if (sorted) fragments.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const canon = { template: doc.template, fragments };
+  return createHash("sha256").update(JSON.stringify(canon)).digest("hex");
+}
+
+async function snapshotVersion(db, prompt) {
+  const hash = contentHash(prompt, true);
+  const legacyHash = contentHash(prompt, false);
+  const versions = db.collection("prompt_versions");
+  const existing = await versions.findOne({
+    promptName: prompt.name,
+    version: prompt.version,
+  });
+  if (existing) {
+    const existingHash = existing.contentHash || contentHash(existing, true);
+    if (existingHash !== hash && existingHash !== legacyHash) {
+      throw new Error(
+        `prompt_versions already holds ${prompt.name} v${prompt.version} with different content — refusing to overwrite an immutable snapshot`
+      );
+    }
+    return { versionId: existing._id, created: false };
+  }
+  const { _id, ...doc } = prompt;
+  const { insertedId } = await versions.insertOne({
+    ...doc,
+    promptName: prompt.name,
+    frozenAt: new Date(),
+    contentHash: hash,
+  });
+  return { versionId: insertedId, created: true };
+}
 
 export async function runRollback(repoRoot, promptName, opts = {}) {
   if (!promptName) {
@@ -56,12 +90,14 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
     });
     const newVersion = current.version + 1;
     const updatedAt = new Date();
+    const restoredHash = contentHash({ template: snapshot.template, fragments }, true);
     const res = await db.collection("prompts").updateOne(
       { _id: current._id, version: current.version },
       {
         $set: {
           fragments,
           template: snapshot.template,
+          contentHash: restoredHash,
           version: newVersion,
           updatedAt,
           updatedBy: "cli",
@@ -71,7 +107,7 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
     if (res.matchedCount !== 1) {
       throw new Error(`prompt "${promptName}" changed concurrently — rollback aborted, prompt untouched`);
     }
-    const updated = { ...current, fragments, template: snapshot.template, version: newVersion, updatedAt, updatedBy: "cli" };
+    const updated = { ...current, fragments, template: snapshot.template, contentHash: restoredHash, version: newVersion, updatedAt, updatedBy: "cli" };
     const { versionId } = await snapshotVersion(db, updated);
     console.log(`rolled back: ${promptName} v${current.version} -> v${newVersion} (content of v${snapshot.version})`);
     console.log(`  snapshot created: prompt_versions ${versionId} (v${newVersion})`);

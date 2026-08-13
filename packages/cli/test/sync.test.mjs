@@ -9,7 +9,7 @@ import {
   pickSemanticHits,
   edgeEndpoints,
   hasEdgeBetween,
-} from "../src/sync.mjs";
+} from "../src/sync-check.mjs";
 
 const prompts = [
   {

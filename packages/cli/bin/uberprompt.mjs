@@ -94,13 +94,15 @@ Commands:
                         re-embed via Voyage, then run the stage-4 sync check.
                           --no-sync        skip the automatic sync check
   reject <id>           Mark a pending proposal rejected.
-  sync <p[.frag]>       Stage 4, manual run: diff the prompt's current version
-                        against its latest prompt_versions snapshot, walk the
-                        Mongo edges graph for dependents of each changed
-                        fragment, discover undeclared semantic edges via
-                        \$vectorSearch (cosine >= 0.80, top 5), LLM-check each
-                        dependent for contradiction, and file source
-                        "sync-check" proposals for the ones that broke.
+  sync-check <p[.frag]> Stage 4, manual run (alias: sync; approve and rollback
+                        trigger it automatically): diff the prompt's current
+                        version against its latest prompt_versions snapshot,
+                        walk the Mongo edges graph for dependents of each
+                        changed fragment, discover undeclared semantic edges
+                        via \$vectorSearch (cosine >= 0.80, top 5, persisted
+                        with confidence), LLM-check each dependent for
+                        contradiction, and file source "sync-check" proposals
+                        for the ones that broke.
                           --dry-run        print without writing anything
                           --model <m>      LLM to use (default gpt-5.1)
   rollback <prompt>     Restore a prompt from a prompt_versions snapshot as a
@@ -163,8 +165,9 @@ async function main() {
       const { runReject } = await import("../src/review.mjs");
       return await runReject(root, opts._[1]);
     }
-    case "sync": {
-      const { runSyncCommand } = await import("../src/sync.mjs");
+    case "sync":
+    case "sync-check": {
+      const { runSyncCommand } = await import("../src/sync-check.mjs");
       return await runSyncCommand(root, opts._[1], opts);
     }
     case "rollback": {

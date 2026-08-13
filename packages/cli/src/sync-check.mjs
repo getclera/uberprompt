@@ -28,9 +28,9 @@ const CONSISTENCY_TOOL = {
     properties: {
       consistent: { type: "boolean" },
       reason: { type: "string" },
-      newText: { type: "string" },
+      newText: { type: ["string", "null"] },
     },
-    required: ["consistent", "reason"],
+    required: ["consistent", "reason", "newText"],
   },
 };
 

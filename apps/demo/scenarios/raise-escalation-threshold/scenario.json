@@ -1,12 +1,12 @@
 {
   "name": "raise-escalation-threshold",
-  "description": "Raise the churn-risk escalation threshold from $5,000 to $10,000 ARR in the canonical escalation-criteria fragment. The declared graph only reaches escalation-writer; triage-router paraphrases the old threshold in its local routing-rules fragment and silently keeps routing on $5k — the sync agent must infer that edge and propose the fix.",
+  "description": "Raise the churn-risk escalation threshold from $50,000 to $100,000 per year in the canonical escalation-criteria fragment. The declared graph only reaches escalation-writer; triage-router paraphrases the old threshold in its local routing-rules fragment and silently keeps routing on $50k — the sync agent must infer that edge and propose the fix.",
   "steps": [
     {
       "file": "apps/demo/fragments/escalation-criteria.json",
       "field": "text",
-      "find": "churn risk on an account worth more than $5,000 ARR",
-      "replace": "churn risk on an account worth more than $10,000 ARR",
+      "find": "more than $50,000 per year",
+      "replace": "more than $100,000 per year",
       "bumpVersion": true
     }
   ],
@@ -19,14 +19,14 @@
         "prompt": "triage-router",
         "fragment": "routing-rules",
         "kind": "semantic",
-        "contradiction": "routing-rules still says 'roughly $5k+ in yearly spend'; canonical criteria now says $10,000 ARR",
-        "stalePhrase": "roughly $5k+ in yearly spend"
+        "contradiction": "routing-rules still says 'roughly $50k+ a year in orders'; canonical criteria now says $100,000 per year",
+        "stalePhrase": "roughly $50k+ a year in orders"
       }
     ],
     "demo": {
       "ticket": "ticket.json",
-      "before": "triage-router routes the $7k churn ticket to escalation (old $5k rule)",
-      "after": "once the inferred proposal for routing-rules is approved, triage-router routes the same ticket to billing — $7k is below the new $10k threshold"
+      "before": "triage-router routes the $70k churn ticket to escalation (old $50k rule)",
+      "after": "once the inferred proposal for routing-rules is approved, triage-router routes the same ticket to order — $70k is below the new $100k threshold"
     }
   }
 }

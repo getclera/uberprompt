@@ -48,19 +48,31 @@ branches listed in IDEA.md instead of rewriting.
       proposals, approve = prompt_versions snapshot (+contentHash) + fragment rewrite +
       version bump + Voyage re-embed + status "applied". Verified end-to-end against
       live Atlas with a synthetic lesson (cleaned up after; billing-agent restored to v1).
-  - Benched: culprit rung + eval gate (PR #8).
+  - [x] (shlok) Stage 3 agent (`apps/agent`): targeting ladder, culprit diagnosis with
+        undeclared blast radius, eval gate, lessons change-stream watcher — un-benched
+        from PR #8, now the live stage-3 path.
+  - [x] (shlok) Eval gate correctness: golden-only prompts can pass (a replay-less
+        target used to fail unconditionally), judge failures count as ties instead of
+        losses, baseline outputs are reused across retry attempts, and the win delta
+        drops `lessonAdherence` so lesson-parroting alone can't clear the gate.
+  - [x] (shlok) One approve path: `uberprompt approve` bridges to
+        `approveProposal` (sdk); `review.mjs`'s duplicate — which never wrote
+        `contentHash` and never inserted the new-version snapshot — is deleted.
+  - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
+    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
+    from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
 - [x] (talwe+claude — taken over from felix, done pending merge) 4 — Semantic
-      sync check: `runSyncCheck` (packages/cli/src/sync.mjs) runs inline at the
-      end of every approve/rollback (function call, not a watcher) and manually
-      via `uberprompt sync <prompt[.fragment]>`. Dependents = Mongo `edges`
-      graph walk (felix's buildGraph/dependentsOf over a thin adapter) ∪
+      sync check: `runSyncCheck` (packages/cli/src/sync.mjs) runs inline after
+      every successful approve bridge and rollback (function call, not a
+      watcher; `--no-sync` opts out) and manually via
+      `uberprompt sync <prompt[.fragment]>`. Dependents = Mongo `edges` graph
+      walk (felix's buildGraph/dependentsOf over a thin adapter) ∪
       `$vectorSearch` discovery (cosine >= 0.80, top 5) with new
       `kind:"semantic"` edges persisted (confidence/model/inferredAt); gpt-5.1
       consistency check files `source:"sync-check"` proposals for real
-      conflicts. Plus: `uberprompt reembed` (embedding-space backfill + verify),
-      approve now snapshots the post-change version too, and
-      `uberprompt rollback <prompt> [--to N]` restores a snapshot as a new
-      version (append-only) and fires the sync check.
+      conflicts. Plus: `uberprompt reembed` (embedding-space backfill + verify)
+      and `uberprompt rollback <prompt> [--to N]` — restores a snapshot as a
+      new version (append-only) and fires the sync check.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
@@ -83,7 +95,8 @@ branches listed in IDEA.md instead of rewriting.
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
     Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
     the answer-key neighbors judged consistent — loop converges quiet in wave 1.
-  - Seam items above all closed by the stage-4 PR: IDEA.md now states the
-    function-call handoff, `uberprompt reembed` repaired the split embedding
-    space (verified 0.849/0.832 known-good pairs), and apps/demo JSON is
-    officially seed-only (Mongo canonical — no write-back).
+  - Seam items above all closed by the stage-4 PR: sync check chained onto
+    approve (and rollback), IDEA.md states the function-call handoff,
+    `uberprompt reembed` repaired the split embedding space (verified
+    0.849/0.832 known-good pairs), and apps/demo JSON is officially seed-only
+    (Mongo canonical — no write-back).

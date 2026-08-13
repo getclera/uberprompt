@@ -1,11 +1,14 @@
-import {
-  loadEnv,
-  requireEnv,
-  connect,
-  parseObjectId,
-  contentHash,
-  voyageEmbed,
-} from "./store.mjs";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadEnv, requireEnv, connect, parseObjectId } from "./store.mjs";
+
+function workspaceRoot(fallback) {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidate = resolve(here, "..", "..", "..");
+  return existsSync(join(candidate, "packages", "sdk")) ? candidate : fallback;
+}
 
 async function loadPending(db, _id) {
   const proposal = await db.collection("proposals").findOne({ _id });
@@ -14,38 +17,6 @@ async function loadPending(db, _id) {
     throw new Error(`proposal ${_id} is "${proposal.status}", not pending`);
   }
   return proposal;
-}
-
-export async function snapshotVersion(db, prompt) {
-  const hash = contentHash(prompt);
-  const versions = db.collection("prompt_versions");
-  const existing = await versions.findOne({
-    promptName: prompt.name,
-    version: prompt.version,
-  });
-  if (existing) {
-    const existingHash = existing.contentHash || contentHash(existing);
-    if (existingHash !== hash) {
-      throw new Error(
-        `prompt_versions already holds ${prompt.name} v${prompt.version} with different content — refusing to overwrite an immutable snapshot`
-      );
-    }
-    if (!existing.contentHash) {
-      await versions.updateOne(
-        { _id: existing._id },
-        { $set: { contentHash: existingHash } }
-      );
-    }
-    return { versionId: existing._id, created: false };
-  }
-  const { _id, ...doc } = prompt;
-  const { insertedId } = await versions.insertOne({
-    ...doc,
-    promptName: prompt.name,
-    frozenAt: new Date(),
-    contentHash: hash,
-  });
-  return { versionId: insertedId, created: true };
 }
 
 export async function runReject(repoRoot, id) {
@@ -68,92 +39,65 @@ export async function runReject(repoRoot, id) {
   }
 }
 
-export async function runApprove(repoRoot, id, opts = {}) {
-  const env = loadEnv(repoRoot);
-  requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "VOYAGE_API_KEY"]);
+function bridgeApprove(cliRoot, id) {
+  const root = workspaceRoot(cliRoot);
+  const sdkDir = join(root, "packages", "sdk");
+  const entry = join(sdkDir, "scripts", "approve.ts");
+  if (!existsSync(entry)) {
+    console.error(`missing ${entry} — run pnpm install at the repo root first`);
+    return Promise.resolve(1);
+  }
+
+  const envFile = join(root, ".env");
+  const args = ["exec", "tsx"];
+  if (existsSync(envFile)) args.push(`--env-file=${envFile}`);
+  args.push(entry, id);
+
+  return new Promise((done) => {
+    const child = spawn("pnpm", args, { cwd: sdkDir, stdio: "inherit" });
+    child.on("exit", (code) => done(code ?? 0));
+    child.on("error", (err) => {
+      console.error(`failed to start: ${err.message}`);
+      done(1);
+    });
+  });
+}
+
+export async function runApprove(cliRoot, id, opts = {}) {
+  if (!id) throw new Error("usage: uberprompt approve <proposalId>");
+  const code = await bridgeApprove(cliRoot, id);
+  if (code !== 0 || opts["no-sync"]) return code;
+
+  const env = loadEnv(cliRoot);
+  requireEnv(env, ["MONGODB_URI", "MONGODB_DB"]);
   const _id = await parseObjectId(id);
   const { client, db } = await connect(env);
   let applied;
   try {
-    const proposal = await loadPending(db, _id);
-    if (!proposal.target.fragment) {
-      throw new Error(`proposal ${_id} has no target fragment — cannot apply`);
+    const proposal = await db.collection("proposals").findOne({ _id });
+    if (!proposal || proposal.status !== "applied") {
+      throw new Error(`proposal ${id} not marked applied after approve — sync check skipped`);
     }
-    const prompt = await db
-      .collection("prompts")
-      .findOne({ name: proposal.target.prompt });
-    if (!prompt) {
-      throw new Error(`prompt "${proposal.target.prompt}" not found`);
-    }
-    const idx = prompt.fragments.findIndex((f) => f.key === proposal.target.fragment);
-    if (idx === -1) {
-      throw new Error(
-        `fragment "${proposal.target.fragment}" not found in prompt "${prompt.name}"`
-      );
-    }
-    if (prompt.fragments[idx].text !== proposal.oldText) {
-      throw new Error(
-        `stale proposal: "${prompt.name}.${proposal.target.fragment}" changed since the proposal was filed — reject it and re-propose`
-      );
-    }
-
-    const { versionId, created } = await snapshotVersion(db, prompt);
-    const embedding = await voyageEmbed(env, proposal.newText);
-    const newVersion = prompt.version + 1;
-    const updatedAt = new Date();
-    const res = await db.collection("prompts").updateOne(
-      { _id: prompt._id, version: prompt.version },
-      {
-        $set: {
-          [`fragments.${idx}.text`]: proposal.newText,
-          [`fragments.${idx}.embedding`]: embedding,
-          version: newVersion,
-          updatedAt,
-          updatedBy: "cli",
-        },
-      }
-    );
-    if (res.matchedCount !== 1) {
-      throw new Error(
-        `prompt "${prompt.name}" changed concurrently — approve aborted after snapshot, prompt untouched`
-      );
-    }
-    const updated = {
-      ...prompt,
-      fragments: prompt.fragments.map((f, i) =>
-        i === idx ? { ...f, text: proposal.newText, embedding } : f
-      ),
-      version: newVersion,
-      updatedAt,
-      updatedBy: "cli",
-    };
-    const { versionId: newVersionId } = await snapshotVersion(db, updated);
-    await db.collection("proposals").updateOne({ _id }, { $set: { status: "applied" } });
-
-    console.log(
-      `applied ${_id}: ${prompt.name}.${proposal.target.fragment} — v${prompt.version} -> v${newVersion}`
-    );
-    console.log(
-      `  snapshot ${created ? "created" : "reused"}: prompt_versions ${versionId} (v${prompt.version})`
-    );
-    console.log(`  snapshot created: prompt_versions ${newVersionId} (v${newVersion})`);
-    console.log("  fragment re-embedded (voyage-3.5-lite)");
+    const snapshot = await db
+      .collection("prompt_versions")
+      .find({ promptName: proposal.target.prompt })
+      .sort({ version: -1 })
+      .limit(1)
+      .next();
     applied = {
-      promptName: prompt.name,
+      promptName: proposal.target.prompt,
       fragmentKey: proposal.target.fragment,
       oldText: proposal.oldText,
       newText: proposal.newText,
-      refId: newVersionId,
+      refId: snapshot?._id ?? null,
     };
   } finally {
     await client.close();
   }
-  if (opts["no-sync"]) return 0;
-  const { runSyncCheck } = await import("./sync.mjs");
-  return runSyncCheck(repoRoot, applied.promptName, applied.fragmentKey, applied.newText, {
+  const { runSyncCheck } = await import("./sync-check.mjs");
+  return runSyncCheck(cliRoot, applied.promptName, applied.fragmentKey, applied.newText, {
     oldText: applied.oldText,
     refId: applied.refId,
     model: opts.model,
-    dryRun: opts["dry-run"],
   });
 }

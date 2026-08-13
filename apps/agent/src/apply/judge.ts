@@ -2,7 +2,7 @@ import type { EvalCase } from "@uberprompt/sdk";
 import { callJson } from "../llm";
 import {
   RUBRIC_AXES,
-  rubricTotal,
+  winTotal,
   verdictFor,
   type EvalCaseSpec,
   type JudgeVerdict,
@@ -54,7 +54,7 @@ export async function judgeCase(args: JudgeArgs): Promise<JudgeVerdict> {
     "- taskFit: accomplishes what this case requires for this input.",
     "- tone: appropriate, warm, professional voice.",
     "- specificity: concrete and grounded in this case, not generic filler.",
-    "- lessonAdherence: respects the lesson without overcorrecting into unhelpfulness.",
+    "- lessonAdherence: respects the lesson without overcorrecting into unhelpfulness. Recorded for diagnostics only — following the lesson is not itself a quality win, so never let it raise or lower the other three axes.",
     "",
     "Score A and B independently against the case requirements, not against each other. Ties are legitimate: responses of equal quality must receive equal scores. Never reward length; extra words without extra substance should lower specificity. Explain the meaningful differences briefly.",
   ].join("\n");
@@ -88,7 +88,7 @@ export async function scoreCase(
   });
   const candidate = candidateIsA ? verdict.a : verdict.b;
   const baseline = candidateIsA ? verdict.b : verdict.a;
-  const delta = rubricTotal(candidate) - rubricTotal(baseline);
+  const delta = winTotal(candidate) - winTotal(baseline);
   return {
     caseId: spec.caseId,
     kind: spec.kind,

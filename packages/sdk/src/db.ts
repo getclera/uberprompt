@@ -8,6 +8,7 @@ import {
   type PromptVersionDoc,
   type ProposalDoc,
   type SpanDoc,
+  type SyncStateDoc,
   type TraceDoc,
 } from "./types";
 
@@ -56,6 +57,10 @@ export function proposalsCol(): Collection<ProposalDoc> {
 
 export function evalRunsCol(): Collection<EvalRunDoc> {
   return getDb().collection<EvalRunDoc>(COLLECTIONS.evalRuns);
+}
+
+export function syncStateCol(): Collection<SyncStateDoc> {
+  return getDb().collection<SyncStateDoc>(COLLECTIONS.syncState);
 }
 
 export async function closeDb(): Promise<void> {

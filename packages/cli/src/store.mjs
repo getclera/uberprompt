@@ -1,6 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
 
 const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"];
 const VOYAGE_URL = "https://ai.mongodb.com/v1/embeddings";
@@ -52,14 +51,6 @@ export async function parseObjectId(id) {
   return new ObjectId(id);
 }
 
-export function contentHash(doc) {
-  const canon = {
-    template: doc.template,
-    fragments: doc.fragments.map((f) => ({ key: f.key, text: f.text })),
-  };
-  return createHash("sha256").update(JSON.stringify(canon)).digest("hex");
-}
-
 export async function voyageEmbedBatch(env, texts) {
   if (texts.length === 0) return [];
   const res = await fetch(VOYAGE_URL, {
@@ -107,31 +98,20 @@ export function cosine(a, b) {
 export const VOYAGE_EMBED_MODEL = VOYAGE_MODEL;
 
 export async function openaiClient(env) {
-  const { default: OpenAI } = await import("openai");
-  return new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  return createOpenAI({ apiKey: env.OPENAI_API_KEY });
 }
 
-export async function structuredCall(client, model, prompt, tool) {
-  const resp = await client.chat.completions.create({
-    model,
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
-      },
-    ],
-    tool_choice: { type: "function", function: { name: tool.name } },
-    messages: [{ role: "user", content: prompt }],
+export async function structuredCall(provider, model, prompt, tool) {
+  const { generateText, Output, jsonSchema } = await import("ai");
+  const { output } = await generateText({
+    model: provider(model),
+    output: Output.object({ schema: jsonSchema(tool.parameters) }),
+    prompt: `${tool.description}\n\n${prompt}`,
+    telemetry: { functionId: `cli-${tool.name}` },
   });
-  const call = (resp.choices[0]?.message?.tool_calls || []).find(
-    (c) => c.function?.name === tool.name
-  );
-  if (!call) throw new Error(`model returned no ${tool.name} tool call`);
-  return JSON.parse(call.function.arguments);
+  if (!output) throw new Error(`model returned no ${tool.name} output`);
+  return output;
 }
 
 export function truncate(text, max) {

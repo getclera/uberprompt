@@ -9,6 +9,7 @@ export const COLLECTIONS = {
   lessons: "lessons",
   proposals: "proposals",
   evalRuns: "eval_runs",
+  syncState: "sync_state",
 } as const;
 
 export interface PromptFragment {
@@ -133,11 +134,19 @@ export interface LessonDoc {
   ts: Date;
 }
 
+export interface UndeclaredHit {
+  prompt: string;
+  fragment: string;
+  score: number;
+  kind: "semantic" | "literal";
+}
+
 export interface ProposalCulprit {
   fragment: string;
   span: string;
   traceIds: ObjectId[];
   sharedWith: string[];
+  undeclared?: UndeclaredHit[];
 }
 
 export interface ProposalEvals {
@@ -196,4 +205,10 @@ export interface EvalRunDoc {
   judgeModel: string;
   genModel: string;
   ts: Date;
+}
+
+export interface SyncStateDoc {
+  _id: string;
+  resumeToken: unknown;
+  updatedAt: Date;
 }

@@ -1,8 +1,10 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { createHash } from "node:crypto";
-import { edgesCol, promptsCol, promptVersionsCol } from "./db";
+import type { ObjectId } from "mongodb";
+import { edgesCol, promptsCol, promptVersionsCol, proposalsCol } from "./db";
 import { embed, embedMany } from "./embeddings";
+import { withTransaction } from "./queries";
 import type { EdgeEndpoint, PromptDoc, PromptFragment } from "./types";
 
 export const DESCRIPTION_MODEL = process.env.OPENAI_REASONING_MODEL ?? "gpt-5.1";
@@ -146,4 +148,82 @@ export async function loadPrompt(name: string): Promise<PromptDoc> {
 
 export async function renderPrompt(name: string): Promise<string> {
   return renderPromptDoc(await loadPrompt(name));
+}
+
+export function nextVersionOf(
+  doc: PromptDoc,
+  key: string,
+  text: string,
+  embedding: number[],
+): PromptDoc {
+  if (!doc.fragments.some((f) => f.key === key)) {
+    throw new Error(`Prompt "${doc.name}" has no fragment "${key}"`);
+  }
+  const fragments = doc.fragments.map((f) => (f.key === key ? { ...f, text, embedding } : f));
+  return {
+    ...doc,
+    version: doc.version + 1,
+    fragments,
+    contentHash: computePromptContentHash(doc.template, fragments),
+    updatedAt: new Date(),
+    updatedBy: "approval",
+  };
+}
+
+export interface ApprovalResult {
+  prompt: string;
+  version: number;
+  fragment: string;
+  contentHash: string;
+}
+
+export async function approveProposal(proposalId: ObjectId): Promise<ApprovalResult> {
+  const proposal = await proposalsCol().findOne({ _id: proposalId });
+  if (!proposal) throw new Error(`Proposal not found: ${proposalId.toHexString()}`);
+  if (proposal.status !== "pending") {
+    throw new Error(
+      `Proposal ${proposalId.toHexString()} is "${proposal.status}" — only pending proposals can be approved`,
+    );
+  }
+  const key = proposal.target.fragment;
+  if (!key) throw new Error(`Proposal ${proposalId.toHexString()} names no target fragment`);
+
+  const current = await loadPrompt(proposal.target.prompt);
+  const fragment = current.fragments.find((f) => f.key === key);
+  if (!fragment) throw new Error(`Prompt "${current.name}" has no fragment "${key}"`);
+  if (fragment.text !== proposal.oldText) {
+    throw new Error(
+      `Fragment "${key}" of "${current.name}" changed since this proposal was filed — re-run the lesson against v${current.version}`,
+    );
+  }
+
+  const embedding = await embed(proposal.newText);
+  const { _id, ...next } = nextVersionOf(current, key, proposal.newText, embedding);
+  await withTransaction(async (session) => {
+    const written = await promptsCol().updateOne(
+      { name: next.name, version: current.version },
+      { $set: { ...next } },
+      { session },
+    );
+    if (written.matchedCount !== 1) {
+      throw new Error(
+        `Prompt "${next.name}" moved past v${current.version} while this approval was running — nothing was applied`,
+      );
+    }
+    await promptVersionsCol().insertOne(
+      { ...next, promptName: next.name, frozenAt: new Date() },
+      { session },
+    );
+    await proposalsCol().updateOne(
+      { _id: proposalId },
+      { $set: { status: "applied" } },
+      { session },
+    );
+  });
+  return {
+    prompt: next.name,
+    version: next.version,
+    fragment: key,
+    contentHash: next.contentHash ?? "",
+  };
 }
