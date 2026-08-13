@@ -48,7 +48,19 @@ branches listed in IDEA.md instead of rewriting.
       proposals, approve = prompt_versions snapshot (+contentHash) + fragment rewrite +
       version bump + Voyage re-embed + status "applied". Verified end-to-end against
       live Atlas with a synthetic lesson (cleaned up after; billing-agent restored to v1).
-  - Benched: culprit rung + eval gate (PR #8).
+  - [x] (shlok) Stage 3 agent (`apps/agent`): targeting ladder, culprit diagnosis with
+        undeclared blast radius, eval gate, lessons change-stream watcher — un-benched
+        from PR #8, now the live stage-3 path.
+  - [x] (shlok) Eval gate correctness: golden-only prompts can pass (a replay-less
+        target used to fail unconditionally), judge failures count as ties instead of
+        losses, baseline outputs are reused across retry attempts, and the win delta
+        drops `lessonAdherence` so lesson-parroting alone can't clear the gate.
+  - [x] (shlok) One approve path: `uberprompt approve` bridges to
+        `approveProposal` (sdk); `review.mjs`'s duplicate — which never wrote
+        `contentHash` and never inserted the new-version snapshot — is deleted.
+  - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
+    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
+    from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
@@ -64,8 +76,7 @@ branches listed in IDEA.md instead of rewriting.
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
     Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
     the answer-key neighbors judged consistent — loop converges quiet in wave 1.
-  - Still open at the seam: IDEA.md handoff section still says change-stream
-    (update to the call shape; chain sync-check onto approve); all embeddings
+  - Still open at the seam: chain sync-check onto approve; all embeddings
     written before ~21:41Z Aug 13 (6 prompts + lesson 1) are orthogonal to the
     current endpoint's space — semantic-edge discovery returns noise until
     re-embedded; apps/demo JSON diverged from Mongo after the apply (files

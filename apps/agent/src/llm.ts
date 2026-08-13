@@ -2,7 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { Output, generateText, jsonSchema } from "ai";
 
 export const REASONING_MODEL = process.env.OPENAI_REASONING_MODEL ?? "gpt-5.1";
-export const GENERATION_MODEL = process.env.OPENAI_GENERATION_MODEL ?? "gpt-4.1-mini";
+export const GENERATION_MODEL = process.env.OPENAI_GENERATION_MODEL ?? "gpt-5.4-mini";
 
 export async function callJson<T>(prompt: string, schema: Record<string, unknown>): Promise<T> {
   const { output } = await generateText({
@@ -22,7 +22,7 @@ export async function generate(system: string, user: string): Promise<string> {
     model: openai(GENERATION_MODEL),
     system,
     prompt: user,
-    telemetry: { functionId: "agent-generate" },
+    telemetry: { isEnabled: false },
   });
   if (text.trim().length === 0) {
     throw new Error(`${GENERATION_MODEL} returned no content`);

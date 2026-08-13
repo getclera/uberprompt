@@ -42,13 +42,27 @@ the version bump happens on approval.
 3. **RAG**: vector search of the lesson embedding over embedded *purpose
    descriptions* (`descriptions_embedding`), not literal prompt text — decided
    IN scope, it's cheap.
-**Benched (good ideas, not today's scope — from PR #8/#32):** culprit rung
-(fragment+span-level fault localization with blast radius) and the eval gate
-(pairwise-judged replay + golden-set scoring before a proposal surfaces, with the
-`"evaluating"` status). Layer onto the approve path if un-benched.
+**Un-benched and shipped:** the culprit rung (fragment+span fault localization with
+declared + undeclared blast radius) and the eval gate (pairwise-judged replay +
+golden-set scoring behind the `"evaluating"` status) both run in stage 3 today.
 
-**Stage 3→4 handoff:** approve's version bump is the trigger; Felix's dependency
-check (stage 4) consumes it (change-stream or explicit invoke — Felix's call).
+**Eval gate scoring:** the judge scores four axes 1–5, but only **taskFit, tone,
+specificity** sum into the win/loss delta (`WIN_AXES`). `lessonAdherence` is
+recorded and reported as a diagnostic only — a candidate that merely parrots the
+lesson without getting better must not clear the gate.
+
+**Approve has exactly one implementation** — `approveProposal` in
+`packages/sdk/src/prompt.ts` (version bump + `contentHash` + re-embed + new-version
+`prompt_versions` snapshot + `status: "applied"`, all in one transaction).
+`uberprompt approve` bridges to it via `packages/sdk/scripts/approve.ts`; the old
+duplicate logic in `packages/cli/src/review.mjs` is gone.
+
+**Stage 3→4 handoff:** stage 4 runs today as an explicit call —
+`uberprompt sync-check <prompt>` after an approve. Approve now also inserts the NEW
+version's snapshot into `prompt_versions` (it used to snapshot only the pre-change
+version), so the documented `prompt_versions`-insert trigger fires for real when
+stage 4 moves to a change stream. `sync-check` still diffs current against the
+latest snapshot with `version < current`, so both orders work.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
@@ -214,7 +228,8 @@ Database `uberprompt`, collections:
   candidateText: string,
   cases: [{ caseId: string, kind: "replay" | "golden",
             input: object, baselineOutput: string, candidateOutput: string,
-            baseline: Rubric, candidate: Rubric,   // Rubric = 4 axes, 1-5 each
+            baseline: Rubric, candidate: Rubric,   // Rubric = 4 axes, 1-5 each;
+            // delta sums WIN_AXES only (taskFit+tone+specificity), lessonAdherence is diagnostic
             delta: number, verdict: "win" | "tie" | "loss", critique: string }],
   summary: { replayWins: number, replayLosses: number, goldenRegressions: number,
              baselineAvg: number, candidateAvg: number, passed: boolean },
@@ -305,6 +320,11 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
   stage 3 consumes new lessons and stamps `processedAt` after filing proposals.
   `processedAt` is stamped whether the eval gate passed or rejected — a lesson is
   processed once, and the outcome lives on its proposals.
+  Trigger: `apply watch` tails a **change stream** on `lessons` and persists the
+  **resume token**, so a restart continues from the last lesson it saw instead of
+  replaying or skipping. On boot it also drains the backlog (`status: "active"`,
+  no `processedAt`), which covers lessons written while it was down. That is the
+  no-cold-start property, made concrete.
 - Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
   `descriptions_embedding` (function-level match, not literal text).
 - Dependency interface (fragment-level, used by stage 4):

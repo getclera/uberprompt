@@ -1,0 +1,22 @@
+[
+  {
+    "id": "resolved-positive",
+    "input": {
+      "ticketId": "AC-10622",
+      "subject": "Card update sorted",
+      "body": "Thanks, the new card went through and the invoice cleared.",
+      "transcript": "Customer could not update the card on file. Agent walked through the billing portal steps. Customer confirmed the payment cleared and thanked the agent."
+    },
+    "intent": "One-line summary of issue and resolution, sentiment positive with a short reason grounded in the transcript, and one follow-up. Does not invent details that are absent from the conversation."
+  },
+  {
+    "id": "resolved-negative-no-invented-refund",
+    "input": {
+      "ticketId": "AC-10628",
+      "subject": "Still annoyed about the double charge",
+      "body": "It's fixed but this shouldn't have happened.",
+      "transcript": "Customer was double charged $49. Agent confirmed the duplicate against the account and said billing would reverse it after review. No amount was promised as issued. Customer remained irritated."
+    },
+    "intent": "Summarizes accurately and marks sentiment negative with a reason. Reports the refund as under review — exactly as the transcript states — and must NOT upgrade it to a promised or issued amount. Summarizing what happened is still required; refusing to mention the refund at all fails this case."
+  }
+]

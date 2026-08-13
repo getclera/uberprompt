@@ -1,10 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
 
 const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"];
-const VOYAGE_URL = "https://ai.mongodb.com/v1/embeddings";
-const VOYAGE_MODEL = "voyage-3.5-lite";
 
 export function loadEnv(repoRoot) {
   const fileVals = {};
@@ -50,36 +47,6 @@ export async function parseObjectId(id) {
     throw new Error(`"${id}" is not a valid proposal id`);
   }
   return new ObjectId(id);
-}
-
-export function contentHash(doc) {
-  const canon = {
-    template: doc.template,
-    fragments: doc.fragments.map((f) => ({ key: f.key, text: f.text })),
-  };
-  return createHash("sha256").update(JSON.stringify(canon)).digest("hex");
-}
-
-export async function voyageEmbed(env, text) {
-  const res = await fetch(VOYAGE_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.VOYAGE_API_KEY}`,
-    },
-    body: JSON.stringify({ model: VOYAGE_MODEL, input: [text] }),
-  });
-  if (!res.ok) {
-    throw new Error(`voyage embed failed: ${res.status} ${await res.text()}`);
-  }
-  const body = await res.json();
-  const embedding = body.data?.[0]?.embedding;
-  if (!Array.isArray(embedding)) {
-    throw new Error(
-      `voyage embed returned no embedding: ${JSON.stringify(body).slice(0, 200)}`
-    );
-  }
-  return embedding;
 }
 
 export async function openaiClient(env) {
