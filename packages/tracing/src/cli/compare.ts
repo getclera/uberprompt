@@ -1,11 +1,24 @@
 import { closeDb } from "@uberprompt/sdk";
 import { versionDeltas, versionStats, type VersionStats } from "../compare";
+import { estimateCostUsd, formatUsd } from "../cost";
 
 const promptName = process.env.UBERPROMPT_COMPARE_PROMPT;
 const asJson = process.env.UBERPROMPT_COMPARE_JSON === "1";
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
+}
+
+function avgCost(row: VersionStats): number | undefined {
+  return estimateCostUsd(row.model ?? "", {
+    inputTokens: row.avgInputTokens,
+    outputTokens: row.avgOutputTokens,
+  });
+}
+
+function totalCost(row: VersionStats): number | undefined {
+  const avg = avgCost(row);
+  return avg === undefined ? undefined : avg * row.traces;
 }
 
 function score(row: VersionStats): string {
@@ -33,8 +46,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log("prompt                       ver  traces  errors  err%   score  latency  tokens in/out");
-  console.log("-".repeat(92));
+  console.log("prompt                       ver  traces  errors  err%   score  latency  tokens in/out  avg cost     total");
+  console.log("-".repeat(112));
   for (const row of stats) {
     console.log(
       [
@@ -45,7 +58,9 @@ async function main(): Promise<void> {
         pct(row.errorRate).padStart(6),
         score(row).padStart(7),
         `${String(row.avgLatencyMs).padStart(6)}ms`,
-        `${row.avgInputTokens ?? "-"}/${row.avgOutputTokens ?? "-"}`,
+        `${row.avgInputTokens ?? "-"}/${row.avgOutputTokens ?? "-"}`.padEnd(13),
+        formatUsd(avgCost(row)).padStart(9),
+        formatUsd(totalCost(row)).padStart(9),
       ].join("  "),
     );
   }
@@ -75,6 +90,14 @@ async function main(): Promise<void> {
       `  latency    ${delta.from.avgLatencyMs}ms -> ${delta.to.avgLatencyMs}ms   ` +
         `${delta.latencyDelta >= 0 ? "+" : ""}${delta.latencyDelta}ms  ${arrow(delta.latencyDelta, false)}`,
     );
+    const fromCost = avgCost(delta.from);
+    const toCost = avgCost(delta.to);
+    if (fromCost !== undefined && toCost !== undefined) {
+      console.log(
+        `  cost/call  ${formatUsd(fromCost)} -> ${formatUsd(toCost)}   ` +
+          `${toCost - fromCost >= 0 ? "+" : ""}${formatUsd(Math.abs(toCost - fromCost))}  ${arrow(toCost - fromCost, false)}`,
+      );
+    }
   }
 }
 

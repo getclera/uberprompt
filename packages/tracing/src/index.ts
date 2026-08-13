@@ -1,6 +1,7 @@
 export * from "./attributes";
 export * from "./binding";
 export * from "./compare";
+export * from "./cost";
 export * from "./exporter";
 export * from "./indexes";
 export * from "./normalize";
