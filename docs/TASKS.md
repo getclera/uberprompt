@@ -53,4 +53,14 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
-- [ ] (unclaimed) Wire end-to-end, dry-run the 4-min script in IDEA.md
+- [ ] (talwe+claude — in progress) Wire end-to-end, dry-run the 4-min script in IDEA.md
+  - Stage 3 verified live (Aug 13): approved proposal `6a7e40ee…` for real —
+    tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
+    evidence in `docs/PIPELINE-TEST.md`.
+  - Stage 3→4 seam findings (details + measurements in PIPELINE-TEST.md):
+    stage 4 exists nowhere (main or branches); approve never inserts the NEW
+    version into `prompt_versions`, so the IDEA.md change-stream trigger has no
+    event to fire on; all embeddings written before ~21:41Z Aug 13 (6 prompts +
+    lesson 1) are orthogonal to the current endpoint's space — vector discovery
+    over them returns noise until re-embedded; apps/demo JSON diverged from Mongo
+    after the apply (files still v1).
