@@ -1,12 +1,14 @@
 import type { Document } from "mongodb";
 import { COLLECTIONS, spansCol } from "@uberprompt/sdk";
 
-const ROOT = {
-  $ifNull: [
-    { $first: { $filter: { input: "$spans", cond: { $not: [{ $ifNull: ["$$this.parentSpanId", false] }] } } } },
-    { $first: "$spans" },
-  ],
+const TRUE_ROOT = {
+  $first: { $filter: { input: "$spans", cond: { $not: [{ $ifNull: ["$$this.parentSpanId", false] }] } } },
 };
+
+// Metadata falls back to the earliest span so a batch that arrives before the root
+// still produces a usable trace. Usage deliberately does NOT use this fallback —
+// see rootUsageOrChildren.
+const ROOT = { $ifNull: [TRUE_ROOT, { $first: "$spans" }] };
 
 const LLM_SPAN = {
   $first: { $filter: { input: "$spans", cond: { $ne: [{ $ifNull: ["$$this.genAi.requestModel", null] }, null] } } },
@@ -40,8 +42,13 @@ function sumOverChildren(field: string): Document {
   };
 }
 
+// The root span carries the whole call's aggregate and each child carries its own, so
+// summing everything double-counts. But BatchSpanProcessor exports children before the
+// root (the root ends last), so a rollup often runs with no root present yet — and
+// reading usage off the metadata fallback would report one child's tokens as the whole
+// trace. Only a true root's usage is trusted; otherwise sum the children.
 function rootUsageOrChildren(field: string, childSum: string): Document {
-  return { $ifNull: [`$root.genAi.usage.${field}`, childSum] };
+  return { $ifNull: [`$trueRoot.genAi.usage.${field}`, childSum] };
 }
 
 export function rollupPipeline(traceIds: string[]): Document[] {
@@ -68,6 +75,7 @@ export function rollupPipeline(traceIds: string[]): Document[] {
     {
       $set: {
         root: ROOT,
+        trueRoot: TRUE_ROOT,
         llm: LLM_SPAN,
         bound: BOUND_SPAN,
         provider: WITH_PROVIDER,

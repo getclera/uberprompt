@@ -19,10 +19,24 @@ export const DEFAULT_PRICING: Record<string, ModelPricing> = {
   "claude-haiku-4-5": { inputPerMTok: 1, outputPerMTok: 5, cacheReadPerMTok: 0.1, cacheWritePerMTok: 1.25 },
 };
 
+let pricingCache: Record<string, ModelPricing> | undefined;
+
+// Parsed once: pricingFor runs per rendered row, and a malformed override would
+// otherwise throw mid-render and take down the whole command.
 function loadPricing(): Record<string, ModelPricing> {
+  if (pricingCache !== undefined) return pricingCache;
   const raw = process.env.UBERPROMPT_PRICING;
-  if (raw === undefined) return DEFAULT_PRICING;
-  return { ...DEFAULT_PRICING, ...(JSON.parse(raw) as Record<string, ModelPricing>) };
+  if (raw === undefined) {
+    pricingCache = DEFAULT_PRICING;
+    return pricingCache;
+  }
+  try {
+    pricingCache = { ...DEFAULT_PRICING, ...(JSON.parse(raw) as Record<string, ModelPricing>) };
+  } catch (err) {
+    console.warn(`ignoring malformed UBERPROMPT_PRICING: ${err instanceof Error ? err.message : err}`);
+    pricingCache = DEFAULT_PRICING;
+  }
+  return pricingCache;
 }
 
 export function pricingFor(model: string): ModelPricing | undefined {
