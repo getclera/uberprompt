@@ -1,0 +1,68 @@
+:root {
+  --vp-c-brand-1: #D8868E;
+  --vp-c-brand-2: #E89BA0;
+  --vp-c-brand-3: #B85A64;
+  --vp-c-brand-soft: #F2D8DB;
+  --vp-c-bg: #F0F0F2;
+  --vp-c-bg-soft: #E8E6EC;
+  --vp-c-bg-mute: #DDDBE2;
+  --vp-c-text-1: #28262E;
+  --vp-c-text-2: #636070;
+  --vp-c-text-3: #9895A3;
+  --vp-c-divider: #DDDBE2;
+
+  --vp-button-brand-bg: #D8868E;
+  --vp-button-brand-hover-bg: #B85A64;
+  --vp-button-brand-active-bg: #A04E58;
+  --vp-button-brand-text: #fff;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #D8868E, #B8B0C8);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #D8868E33, #B8B0C833);
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+  --vp-c-brand-1: #E89BA0;
+  --vp-c-brand-2: #F0B0B5;
+  --vp-c-brand-3: #D8868E;
+  --vp-c-brand-soft: #2E1A1C;
+  --vp-c-bg: #14131A;
+  --vp-c-bg-soft: #1C1A24;
+  --vp-c-bg-mute: #24222E;
+  --vp-c-text-1: #E4E0EC;
+  --vp-c-text-2: #A09AB0;
+  --vp-c-text-3: #6A6478;
+  --vp-c-divider: #2A2834;
+
+  --vp-button-brand-bg: #D8868E;
+  --vp-button-brand-hover-bg: #E89BA0;
+  --vp-button-brand-active-bg: #F0B0B5;
+  --vp-button-brand-text: #14131A;
+
+  --vp-home-hero-name-background: linear-gradient(135deg, #E89BA0, #B8B0C8);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #E89BA044, #B8B0C844);
+}
+
+.VPNavBarTitle .title {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: inline-block;
+}
+
+.VPNavBarTitle .title::first-letter {
+  color: var(--vp-c-brand-1);
+}
+
+.VPHero .name {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace !important;
+}
+
+.name .clip {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace !important;
+}
+
+.VPFeature .title {
+  color: var(--vp-c-brand-1) !important;
+}
