@@ -76,8 +76,7 @@ branches listed in IDEA.md instead of rewriting.
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
     Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
     the answer-key neighbors judged consistent — loop converges quiet in wave 1.
-  - Still open at the seam: IDEA.md handoff section still says change-stream
-    (update to the call shape; chain sync-check onto approve); all embeddings
+  - Still open at the seam: chain sync-check onto approve; all embeddings
     written before ~21:41Z Aug 13 (6 prompts + lesson 1) are orthogonal to the
     current endpoint's space — semantic-edge discovery returns noise until
     re-embedded; apps/demo JSON diverged from Mongo after the apply (files

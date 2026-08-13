@@ -57,9 +57,12 @@ lesson without getting better must not clear the gate.
 `uberprompt approve` bridges to it via `packages/sdk/scripts/approve.ts`; the old
 duplicate logic in `packages/cli/src/review.mjs` is gone.
 
-**Stage 3→4 handoff:** approve inserts the NEW version's snapshot into
-`prompt_versions`, so watching `prompt_versions` inserts is a trigger that actually
-fires; Felix's dependency check (stage 4) consumes it.
+**Stage 3→4 handoff:** stage 4 runs today as an explicit call —
+`uberprompt sync-check <prompt>` after an approve. Approve now also inserts the NEW
+version's snapshot into `prompt_versions` (it used to snapshot only the pre-change
+version), so the documented `prompt_versions`-insert trigger fires for real when
+stage 4 moves to a change stream. `sync-check` still diffs current against the
+latest snapshot with `version < current`, so both orders work.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
