@@ -146,8 +146,13 @@ export async function runSyncCheck(repoRoot, promptName, opts) {
     const ai = await openaiClient(env);
     let filed = 0;
 
+    const sharedKeys = new Set(
+      edges
+        .filter((e) => e.kind === "uses" && e.to?.fragment && !e.to.prompt)
+        .map((e) => e.to.fragment)
+    );
     for (const change of changes) {
-      const node = `${promptName}.${change.key}`;
+      const node = sharedKeys.has(change.key) ? change.key : `${promptName}.${change.key}`;
       const targets = dependentTargets(graph, byName, promptName, node);
       if (opts.against) {
         const dot = opts.against.indexOf(".");

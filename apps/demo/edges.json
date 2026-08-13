@@ -1,74 +1,150 @@
 [
   {
-    "from": { "prompt": "triage-router" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "triage-router"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Router emits the shared structured lane envelope."
   },
   {
-    "from": { "prompt": "order-agent" },
-    "to": { "fragment": "brand-voice" },
+    "from": {
+      "prompt": "order-agent"
+    },
+    "to": {
+      "fragment": "brand-voice"
+    },
     "kind": "uses",
     "note": "Order replies inherit the Mango Republic tone."
   },
   {
-    "from": { "prompt": "order-agent" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "order-agent"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Order replies use the shared response format."
   },
   {
-    "from": { "prompt": "refund-agent" },
-    "to": { "fragment": "brand-voice" },
+    "from": {
+      "prompt": "refund-agent"
+    },
+    "to": {
+      "fragment": "brand-voice"
+    },
     "kind": "uses",
     "note": "Claim replies inherit the Mango Republic tone."
   },
   {
-    "from": { "prompt": "refund-agent" },
-    "to": { "fragment": "refund-policy" },
+    "from": {
+      "prompt": "refund-agent"
+    },
+    "to": {
+      "fragment": "refund-policy"
+    },
     "kind": "uses",
     "note": "Credit handling must follow the canonical claim policy."
   },
   {
-    "from": { "prompt": "refund-agent" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "refund-agent"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Claim replies use the shared response format."
   },
   {
-    "from": { "prompt": "quality-agent" },
-    "to": { "fragment": "brand-voice" },
+    "from": {
+      "prompt": "quality-agent"
+    },
+    "to": {
+      "fragment": "brand-voice"
+    },
     "kind": "uses",
     "note": "Quality replies inherit the Mango Republic tone."
   },
   {
-    "from": { "prompt": "quality-agent" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "quality-agent"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Quality replies use the shared response format."
   },
   {
-    "from": { "prompt": "escalation-writer" },
-    "to": { "fragment": "brand-voice" },
+    "from": {
+      "prompt": "escalation-writer"
+    },
+    "to": {
+      "fragment": "brand-voice"
+    },
     "kind": "uses",
     "note": "Escalation summaries stay on-brand for the sales team."
   },
   {
-    "from": { "prompt": "escalation-writer" },
-    "to": { "fragment": "escalation-criteria" },
+    "from": {
+      "prompt": "escalation-writer"
+    },
+    "to": {
+      "fragment": "escalation-criteria"
+    },
     "kind": "uses",
     "note": "Escalation writer applies the canonical escalation criteria."
   },
   {
-    "from": { "prompt": "escalation-writer" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "escalation-writer"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Escalation summaries use the shared response format."
   },
   {
-    "from": { "prompt": "satisfaction-summarizer" },
-    "to": { "fragment": "output-format" },
+    "from": {
+      "prompt": "satisfaction-summarizer"
+    },
+    "to": {
+      "fragment": "output-format"
+    },
     "kind": "uses",
     "note": "Satisfaction summaries use the shared response format."
+  },
+  {
+    "from": {
+      "prompt": "triage-router",
+      "fragment": "routing-rules"
+    },
+    "to": {
+      "fragment": "escalation-criteria"
+    },
+    "kind": "semantic",
+    "note": "The triage routing rules reproduce the escalation triggers (mold/pest/contamination; high-value account; repeated contacts; threats) found in escalation-criteria.",
+    "confidence": 0.85,
+    "model": "gpt-5-nano",
+    "inferredAt": "2026-08-13T22:54:59.076Z"
+  },
+  {
+    "from": {
+      "prompt": "escalation-writer",
+      "fragment": "context"
+    },
+    "to": {
+      "fragment": "refund-policy"
+    },
+    "kind": "semantic",
+    "note": "The escalation-writer context reiterates refund-policy constraints (48-hour window, per-bad-crate credits, director approval for large credits, and not promising amounts).",
+    "confidence": 0.88,
+    "model": "gpt-5-nano",
+    "inferredAt": "2026-08-13T22:54:59.076Z"
   }
 ]
