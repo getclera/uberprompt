@@ -32,6 +32,24 @@ If not, push the doc fix (doc-only fixes may go straight to main).
 
 ## Git workflow — merge early, merge often
 
+### Worktrees — ALL code changes go in a worktree, never the primary repo
+
+- The primary checkout stays on `main` and is never modified. Even "quick"
+  one-file fixes go through a worktree. No size/urgency exception — "it's one
+  line", "main already has uncommitted changes here", "a worktree feels like
+  overhead" are all invalid justifications.
+- **The only exception is an explicit, unambiguous instruction to edit the
+  primary repo** (the user naming `main`/the primary checkout and saying to
+  change it there). A terse or ambiguous prompt is not permission — ask instead
+  of guessing.
+- Create worktrees with the `EnterWorktree` tool, then rename the auto branch
+  to `<name>/<task>` (`git branch -m`).
+- Never run git commands in the primary repo while working in a worktree.
+- **Never `git stash`** — worktrees share one stash stack; a stash pushed in
+  one surfaces in the others. Commit to a scratch branch or export a patch
+  (`git diff > patch`) instead.
+- Doc-only fixes to `docs/` may still go straight to main (see below).
+
 - Work on short-lived branches (`<name>/<task>`), one task per branch.
 - Open a PR as soon as there's anything reviewable and **merge fast** — a PR should
   live minutes, not hours. Small diffs, atomic commits (stage specific files, never
@@ -78,3 +96,14 @@ adaptive thinking (default — don't pass a `thinking` config or sampling params
 - **No silent PASS.** Before claiming something works, show the command you ran and
   its real output (typecheck, script run, curl). "It should work" doesn't count.
 - Rebase `origin/main` before every push.
+
+## Debugging discipline (ported from clera-platform)
+
+- **Evidence before root cause.** A hypothesis needs DB/code/log proof before
+  being voiced — never assume data differences or timing explain a bug.
+- **Never blame cache.** "Stale cache" is not a root cause; trace the code path.
+- **Never blame deployment.** 95% of the time it's a code bug — deployment-state
+  theories require direct evidence before being voiced.
+- **Format only files you edited** — never run a repo-wide formatter. If a
+  formatter widens your diff beyond what you touched, `git checkout --` those
+  files before committing.

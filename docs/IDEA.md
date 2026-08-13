@@ -89,7 +89,9 @@ Database `uberprompt`, collections:
 { _id, from: { prompt: string, fragment?: string },
   to:   { prompt: string, fragment?: string },
   kind: "uses" | "semantic",   // "uses" = declared in SDK; "semantic" = agent-found
-  note?: string }
+  note?: string,
+  // semantic edges only — inference provenance:
+  confidence?: number, model?: string, inferredAt?: Date }
 
 // traces
 { _id, promptName: string, promptVersion: number,
@@ -134,11 +136,19 @@ Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
   canonical (brand-voice, refund-policy, escalation-criteria, output-format).
 - `apps/demo/prompts/<name>.json` — `{ name, version, template,
   fragments: [local {key,text}], uses: [shared keys] }`.
-- `apps/demo/edges.json` — declared `uses` edges.
+- `apps/demo/edges.json` — the dependency graph, one central file (mirrors the
+  `edges` collection; edges are pair-owned, so no per-prompt storage). Declared
+  `uses` edges plus inferred `semantic` edges written by `uberprompt infer`.
 - `apps/demo/expected-semantic-edges.json` — ground truth the stage-4 inference
   must discover (e.g. triage-router routing-rules ↔ escalation-criteria;
   escalation-writer context ↔ refund-policy).
 - `apps/demo/traces.seed.json` — seed traces (incl. the seeded failures).
+
+File-first tooling: `packages/cli` ships the **`uberprompt` CLI** — `infer`
+(Claude infers semantic edges from fragment texts → edges.json), `affected`
+(git-diff changed prompt/fragment files → transitive graph walk → impacted
+prompts), `graph` (print the graph). The stage-4 agent and the CLI share the
+same edges.json semantics.
 
 Version = integer, bumped on every text change. The seed script inlines shared
 fragments into each prompt's `fragments` array to match the Mongo contract shape.

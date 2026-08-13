@@ -8,6 +8,8 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (talwe — HUMAN) Atlas cluster, db `uberprompt`, vector indexes, `.env` (MONGODB_URI, ANTHROPIC_API_KEY, VOYAGE_API_KEY)
 - [ ] (unclaimed) Re-land monorepo + SDK from `claude/sdk-scaffold` once plan is locked
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
+- [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
+- [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
 
 ## The four main tasks
 - [ ] (unclaimed) 1 — Trace ingestion: SDK tracedCall + demo app generating traces
