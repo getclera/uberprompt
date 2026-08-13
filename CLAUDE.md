@@ -91,7 +91,9 @@ TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashbo
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
 Embeddings: Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite, 1024d).
 LLM: **OpenAI** (`openai` npm pkg, `OPENAI_API_KEY` in .env) — there is NO Anthropic
-key; don't write `@anthropic-ai/sdk` call paths. Backend first — dashboard is parked.
+key; don't write `@anthropic-ai/sdk` call paths. Default model **`gpt-5.1`**; prefer
+cheap variants (`gpt-5.1-mini`) for bulk/low-stakes calls (trace generation, filters).
+Backend first — dashboard is parked.
 
 ## Code standards (ported from clera-platform, hackathon-weight)
 
