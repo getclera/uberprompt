@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { EvalRunSummary, ProposalDoc } from "@uberprompt/sdk";
-import { hasOpenProposalForLesson, isDuplicateProposal, proposalUpdate, type PromptOutcome } from "./index";
+import { hasProposalFromLesson, isDuplicateProposal, proposalUpdate, shouldStampProcessed, type PromptOutcome } from "./index";
 import type { Candidate } from "./types";
 
 const candidate: Candidate = { newText: "confirm the amount first", reason: "lesson L-1" };
@@ -69,19 +69,19 @@ test("identical pending text is detected despite whitespace differences", () => 
 
 test("no open proposals means nothing is a duplicate", () => {
   assert.equal(isDuplicateProposal([], "anything"), false);
-  assert.equal(hasOpenProposalForLesson([], new ObjectId()), false);
+  assert.equal(hasProposalFromLesson([], new ObjectId()), false);
 });
 
 test("an open proposal from the same lesson short-circuits reprocessing", () => {
   const lessonId = new ObjectId();
   const open = [proposal("something", lessonId)];
-  assert.equal(hasOpenProposalForLesson(open, lessonId), true);
-  assert.equal(hasOpenProposalForLesson(open, new ObjectId()), false);
+  assert.equal(hasProposalFromLesson(open, lessonId), true);
+  assert.equal(hasProposalFromLesson(open, new ObjectId()), false);
 });
 
 test("a proposal from a different source does not block this lesson", () => {
   const open = [proposal("something")];
-  assert.equal(hasOpenProposalForLesson(open, new ObjectId()), false);
+  assert.equal(hasProposalFromLesson(open, new ObjectId()), false);
 });
 
 test("a target with nothing to evaluate is skipped, not reported as a loss", () => {
@@ -98,4 +98,30 @@ test("a target with nothing to evaluate is skipped, not reported as a loss", () 
 test("a failed target is distinguishable from a rejected one", () => {
   const statuses: Array<PromptOutcome["status"]> = ["pending", "rejected", "skipped", "failed"];
   assert.equal(new Set(statuses).size, 4);
+});
+
+function outcome(status: PromptOutcome["status"]): PromptOutcome {
+  return { prompt: "billing-agent", status, reason: "r", reports: [] };
+}
+
+test("a lesson whose target failed outright is left unprocessed so a restart retries it", () => {
+  assert.equal(shouldStampProcessed([outcome("pending"), outcome("failed")]), false);
+  assert.equal(shouldStampProcessed([outcome("failed")]), false);
+});
+
+test("a lesson whose gate rejected every candidate is still processed once", () => {
+  assert.equal(shouldStampProcessed([outcome("rejected"), outcome("skipped")]), true);
+  assert.equal(shouldStampProcessed([outcome("pending")]), true);
+  assert.equal(shouldStampProcessed([]), true);
+});
+
+test("a rejected proposal from this lesson blocks a rerun, not just an open one", () => {
+  const lessonId = new ObjectId();
+  const rejected = { ...proposal("tried and judged worse", lessonId), status: "rejected" as const };
+  assert.equal(hasProposalFromLesson([rejected], lessonId), true);
+});
+
+test("text already rejected for this fragment is not re-proposed", () => {
+  const rejected = { ...proposal("Confirm the numbers first."), status: "rejected" as const };
+  assert.equal(isDuplicateProposal([rejected], "Confirm  the numbers   first."), true);
 });

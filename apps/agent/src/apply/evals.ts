@@ -13,7 +13,7 @@ import { scoreCase } from "./judge";
 import { composeInput, fillInputs, withFragment, withOpenSlots } from "./render";
 import {
   RUBRIC_AXES,
-  WIN_THRESHOLD,
+  winTotal,
   type EvalCaseSpec,
   type EvalReport,
   type GoldenCase,
@@ -81,6 +81,7 @@ export interface RunEvalArgs {
   candidateText: string;
   lessonText: string;
   cases: EvalCaseSpec[];
+  baselineOutputs?: Record<string, string>;
   gen?: (system: string, user: string) => Promise<string>;
   score?: (
     spec: EvalCaseSpec,
@@ -105,10 +106,14 @@ function failedCase(
     candidateOutput,
     baseline: zeroRubric(),
     candidate: zeroRubric(),
-    delta: -WIN_THRESHOLD,
-    verdict: "loss",
-    critique: `Judge call failed: ${error instanceof Error ? error.message : String(error)}`,
+    delta: 0,
+    verdict: "tie",
+    critique: `Judge call failed, case counted as a tie: ${error instanceof Error ? error.message : String(error)}`,
   };
+}
+
+function isScored(c: EvalCase): boolean {
+  return winTotal(c.baseline) + winTotal(c.candidate) > 0;
 }
 
 export function summarizeCases(cases: EvalCase[]): EvalRunSummary {
@@ -118,20 +123,21 @@ export function summarizeCases(cases: EvalCase[]): EvalRunSummary {
   const goldenRegressions = cases.filter(
     (c) => c.kind === "golden" && c.verdict === "loss",
   ).length;
+  const scored = cases.filter(isScored);
   const avg = (pick: (c: EvalCase) => Rubric): number =>
-    cases.length === 0
+    scored.length === 0
       ? 0
-      : cases.reduce(
+      : scored.reduce(
           (sum, c) => sum + RUBRIC_AXES.reduce((s, axis) => s + (pick(c)[axis] ?? 0), 0),
           0,
-        ) / cases.length;
+        ) / scored.length;
   const goldens = cases.filter((c) => c.kind === "golden");
   const goldenWins = goldens.filter((c) => c.verdict === "win").length;
   const clean = goldenRegressions === 0 && replayLosses === 0;
   const passed =
     replays.length > 0
-      ? clean && replayWins >= Math.ceil(replays.length / 2) && replayWins >= 1
-      : clean && goldens.length > 0 && goldenWins >= 1;
+      ? clean && replayWins >= Math.ceil(replays.length / 2)
+      : clean && goldens.length > 0 && goldenWins >= Math.ceil(goldens.length / 2);
   return {
     replayWins,
     replayLosses,
@@ -142,6 +148,22 @@ export function summarizeCases(cases: EvalCase[]): EvalRunSummary {
   };
 }
 
+type ScoreFn = NonNullable<RunEvalArgs["score"]>;
+
+async function scoreWithRetry(
+  score: ScoreFn,
+  spec: EvalCaseSpec,
+  baselineOutput: string,
+  candidateOutput: string,
+  lessonText: string,
+): Promise<EvalCase> {
+  try {
+    return await score(spec, baselineOutput, candidateOutput, lessonText);
+  } catch {
+    return score(spec, baselineOutput, candidateOutput, lessonText);
+  }
+}
+
 export async function runEval(args: RunEvalArgs): Promise<EvalReport> {
   const gen = args.gen ?? generate;
   const score = args.score ?? scoreCase;
@@ -150,6 +172,7 @@ export async function runEval(args: RunEvalArgs): Promise<EvalReport> {
     withOpenSlots(withFragment(args.doc, args.fragmentKey, args.candidateText)),
   );
   const results: EvalCase[] = [];
+  const baselineOutputs: Record<string, string> = {};
   let judgeFailures = 0;
   let next = 0;
 
@@ -160,12 +183,14 @@ export async function runEval(args: RunEvalArgs): Promise<EvalReport> {
       const spec = args.cases[index];
       if (!spec) break;
       const user = composeInput(spec.input);
+      const cached = args.baselineOutputs?.[spec.caseId];
       const [baselineOutput, candidateOutput] = await Promise.all([
-        gen(fillInputs(baselineSystem, spec.input), user),
+        cached ?? gen(fillInputs(baselineSystem, spec.input), user),
         gen(fillInputs(candidateSystem, spec.input), user),
       ]);
+      baselineOutputs[spec.caseId] = baselineOutput;
       try {
-        results[index] = await score(spec, baselineOutput, candidateOutput, args.lessonText);
+        results[index] = await scoreWithRetry(score, spec, baselineOutput, candidateOutput, args.lessonText);
       } catch (error) {
         judgeFailures += 1;
         if (judgeFailures > 1) {
@@ -184,6 +209,7 @@ export async function runEval(args: RunEvalArgs): Promise<EvalReport> {
   return {
     cases: results,
     summary: summarizeCases(results),
+    baselineOutputs,
     judgeModel: REASONING_MODEL,
     genModel: GENERATION_MODEL,
   };

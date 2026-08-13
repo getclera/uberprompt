@@ -19,8 +19,7 @@ import { targetPrompts, type TargetHit, type TargetRung } from "./targeting";
 import type { Candidate, Culprit, EvalReport } from "./types";
 
 export const MAX_ATTEMPTS = 2;
-
-const OPEN_STATUSES = ["pending", "evaluating"] as const;
+export const MAX_TARGETS = 4;
 
 function fragmentText(doc: PromptDoc, key: string): string {
   const fragment = doc.fragments.find((f) => f.key === key);
@@ -48,14 +47,16 @@ export function isDuplicateProposal(open: ProposalDoc[], newText: string): boole
   return open.some((p) => normalize(p.newText) === normalize(newText));
 }
 
-export function hasOpenProposalForLesson(open: ProposalDoc[], lessonId: ObjectId): boolean {
-  return open.some((p) => p.source.ref?.equals(lessonId) === true);
+export function hasProposalFromLesson(existing: ProposalDoc[], lessonId: ObjectId): boolean {
+  return existing.some((p) => p.source.ref?.equals(lessonId) === true);
 }
 
-async function openProposalsFor(prompt: string, fragment: string): Promise<ProposalDoc[]> {
-  return proposalsCol()
-    .find({ "target.prompt": prompt, "target.fragment": fragment, status: { $in: [...OPEN_STATUSES] } })
-    .toArray();
+export function shouldStampProcessed(outcomes: PromptOutcome[]): boolean {
+  return !outcomes.some((o) => o.status === "failed");
+}
+
+async function proposalsFor(prompt: string, fragment: string): Promise<ProposalDoc[]> {
+  return proposalsCol().find({ "target.prompt": prompt, "target.fragment": fragment }).toArray();
 }
 
 async function loadLesson(lessonId: ObjectId): Promise<LessonDoc> {
@@ -115,51 +116,27 @@ export interface PromptOutcome {
 export interface ApplyResult {
   lessonId: ObjectId;
   targets: TargetHit[];
+  dropped: TargetHit[];
   outcomes: PromptOutcome[];
+  processed: boolean;
 }
 
-export async function applyLessonToPrompt(
-  lesson: LessonDoc,
-  promptName: string,
-): Promise<PromptOutcome> {
-  const lessonId = lesson._id;
-  if (!lessonId) throw new Error("Lesson has no _id");
-  const doc = await loadPrompt(promptName);
-  const culprit = await findCulprit(lesson, doc);
-  const baselineText = fragmentText(doc, culprit.fragment);
+interface EvaluationContext {
+  lesson: LessonDoc;
+  lessonId: ObjectId;
+  doc: PromptDoc;
+  culprit: Culprit;
+  baselineText: string;
+  existing: ProposalDoc[];
+  proposalId: ObjectId;
+}
 
-  const openBefore = await openProposalsFor(promptName, culprit.fragment);
-  if (hasOpenProposalForLesson(openBefore, lessonId)) {
-    return {
-      prompt: promptName,
-      status: "skipped",
-      reason: `an open proposal for ${promptName}.${culprit.fragment} from this lesson already exists`,
-      culprit,
-      reports: [],
-    };
-  }
-
-  const seed: ProposalDoc = {
-    target: { prompt: promptName, fragment: culprit.fragment },
-    oldText: baselineText,
-    newText: "",
-    reason: culprit.rationale,
-    source: { type: "lesson", ref: lessonId },
-    status: "evaluating",
-    ts: new Date(),
-    culprit: {
-      fragment: culprit.fragment,
-      span: culprit.span,
-      traceIds: culprit.traceIds,
-      sharedWith: culprit.sharedWith,
-    },
-  };
-  const inserted = await proposalsCol().insertOne(seed);
-  const proposalId = inserted.insertedId;
+async function evaluateCandidate(ctx: EvaluationContext): Promise<PromptOutcome> {
+  const { lesson, lessonId, doc, culprit, baselineText, existing, proposalId } = ctx;
+  const promptName = doc.name;
 
   const cases = await collectCases(lesson, promptName);
   if (cases.length === 0) {
-    await proposalsCol().deleteOne({ _id: proposalId });
     return {
       prompt: promptName,
       status: "skipped",
@@ -174,6 +151,7 @@ export async function applyLessonToPrompt(
   const reports: EvalReport[] = [];
   let candidate: Candidate | undefined;
   let critique: string | undefined;
+  let baselineOutputs: Record<string, string> | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     candidate = await authorCandidate({
@@ -186,12 +164,11 @@ export async function applyLessonToPrompt(
       ...(critique ? { critique, previousAttempt: candidate?.newText } : {}),
     });
 
-    if (isDuplicateProposal(openBefore, candidate.newText)) {
-      await proposalsCol().deleteOne({ _id: proposalId });
+    if (isDuplicateProposal(existing, candidate.newText)) {
       return {
         prompt: promptName,
         status: "skipped",
-        reason: `identical text is already proposed for ${promptName}.${culprit.fragment}`,
+        reason: `identical text has already been proposed for ${promptName}.${culprit.fragment}`,
         culprit,
         reports,
       };
@@ -203,8 +180,10 @@ export async function applyLessonToPrompt(
       candidateText: candidate.newText,
       lessonText: lesson.text,
       cases,
+      ...(baselineOutputs ? { baselineOutputs } : {}),
     });
     reports.push(report);
+    baselineOutputs = report.baselineOutputs;
 
     const run: EvalRunDoc = {
       proposalId,
@@ -248,14 +227,79 @@ export async function applyLessonToPrompt(
   };
 }
 
+export async function applyLessonToPrompt(
+  lesson: LessonDoc,
+  promptName: string,
+): Promise<PromptOutcome> {
+  const lessonId = lesson._id;
+  if (!lessonId) throw new Error("Lesson has no _id");
+  const doc = await loadPrompt(promptName);
+  const culprit = await findCulprit(lesson, doc);
+  const baselineText = fragmentText(doc, culprit.fragment);
+
+  const existing = await proposalsFor(promptName, culprit.fragment);
+  if (hasProposalFromLesson(existing, lessonId)) {
+    return {
+      prompt: promptName,
+      status: "skipped",
+      reason: `this lesson already produced a proposal for ${promptName}.${culprit.fragment}`,
+      culprit,
+      reports: [],
+    };
+  }
+
+  const seed: ProposalDoc = {
+    target: { prompt: promptName, fragment: culprit.fragment },
+    oldText: baselineText,
+    newText: "",
+    reason: culprit.rationale,
+    source: { type: "lesson", ref: lessonId },
+    status: "evaluating",
+    ts: new Date(),
+    culprit: {
+      fragment: culprit.fragment,
+      span: culprit.span,
+      traceIds: culprit.traceIds,
+      sharedWith: culprit.sharedWith,
+      ...(culprit.undeclared ? { undeclared: culprit.undeclared } : {}),
+    },
+  };
+  const inserted = await proposalsCol().insertOne(seed);
+  const proposalId = inserted.insertedId;
+
+  try {
+    const outcome = await evaluateCandidate({
+      lesson,
+      lessonId,
+      doc,
+      culprit,
+      baselineText,
+      existing,
+      proposalId,
+    });
+    if (outcome.status === "skipped") await proposalsCol().deleteOne({ _id: proposalId });
+    return outcome;
+  } catch (error) {
+    await proposalsCol().deleteOne({ _id: proposalId, status: "evaluating" });
+    throw error;
+  }
+}
+
 export async function applyLesson(
   lessonId: ObjectId,
   opts: { only?: string } = {},
 ): Promise<ApplyResult> {
   const lesson = await loadLesson(lessonId);
-  const targets = opts.only
+  const ranked = opts.only
     ? [{ prompt: opts.only, rung: "lineage" as const, reason: "explicitly requested" }]
     : await targetPrompts(lesson);
+  const targets = ranked.slice(0, MAX_TARGETS);
+  const dropped = ranked.slice(MAX_TARGETS);
+  if (dropped.length > 0) {
+    console.log(
+      `[apply] ${dropped.length} lower-ranked target(s) dropped by the cap of ${MAX_TARGETS}: ${dropped.map((t) => t.prompt).join(", ")}`,
+    );
+  }
 
   const outcomes: PromptOutcome[] = [];
   for (const target of targets) {
@@ -273,6 +317,13 @@ export async function applyLesson(
     }
   }
 
-  await lessonsCol().updateOne({ _id: lessonId }, { $set: { processedAt: new Date() } });
-  return { lessonId, targets, outcomes };
+  const processed = shouldStampProcessed(outcomes);
+  if (processed) {
+    await lessonsCol().updateOne({ _id: lessonId }, { $set: { processedAt: new Date() } });
+  } else {
+    console.log(
+      `[apply] lesson ${lessonId.toHexString()} left unprocessed — a target failed outright, so a restart will retry it`,
+    );
+  }
+  return { lessonId, targets, dropped, outcomes, processed };
 }

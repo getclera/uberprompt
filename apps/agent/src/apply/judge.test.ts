@@ -30,7 +30,7 @@ test("scoreCase: candidate wins regardless of being shown as A or B", async () =
     });
     assert.deepEqual(result.candidate, highRubric);
     assert.deepEqual(result.baseline, lowRubric);
-    assert.equal(result.delta, 8);
+    assert.equal(result.delta, 5);
     assert.equal(result.verdict, "win");
     assert.equal(result.baselineOutput, "baseline out");
     assert.equal(result.candidateOutput, "candidate out");
@@ -45,7 +45,7 @@ test("scoreCase: baseline wins regardless of position", async () => {
     });
     assert.deepEqual(result.candidate, lowRubric);
     assert.deepEqual(result.baseline, highRubric);
-    assert.equal(result.delta, -8);
+    assert.equal(result.delta, -5);
     assert.equal(result.verdict, "loss");
   }
 });
@@ -84,6 +84,24 @@ test("scoreCase: forwards the case to the judge with correct outputs per slot", 
   assert.equal(result.delta, 0);
   assert.equal(result.verdict, "tie");
   assert.equal(result.critique, "tie");
+});
+
+test("scoreCase: lesson adherence alone never wins the gate", async () => {
+  const equalQuality = { taskFit: 4, tone: 4, specificity: 4 };
+  const adherentJudge = (args: JudgeArgs): Promise<JudgeVerdict> =>
+    Promise.resolve({
+      a: { ...equalQuality, lessonAdherence: args.outputA === "c-out" ? 5 : 1 },
+      b: { ...equalQuality, lessonAdherence: args.outputB === "c-out" ? 5 : 1 },
+      explanation: "candidate parrots the lesson, quality is identical",
+    });
+  const result = await scoreCase(spec, "b-out", "c-out", "lesson", {
+    judge: adherentJudge,
+    candidateGoesFirst: () => true,
+  });
+  assert.equal(result.delta, 0);
+  assert.equal(result.verdict, "tie");
+  assert.equal(result.candidate.lessonAdherence, 5);
+  assert.equal(result.baseline.lessonAdherence, 1);
 });
 
 test("verdictFor thresholds: small deltas are ties", () => {

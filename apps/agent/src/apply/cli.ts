@@ -1,5 +1,12 @@
 import { ObjectId } from "mongodb";
-import { closeDb, lessonsCol, loadPrompt, type EvalCase, type LessonDoc } from "@uberprompt/sdk";
+import {
+  approveProposal,
+  closeDb,
+  lessonsCol,
+  loadPrompt,
+  type EvalCase,
+  type LessonDoc,
+} from "@uberprompt/sdk";
 import { registerUberprompt } from "@uberprompt/tracing";
 import { findCulprit } from "./diagnose";
 import { collectCases, runEval } from "./evals";
@@ -7,19 +14,20 @@ import { authorCandidate } from "./author";
 import { applyLesson } from "./index";
 import { targetPrompts } from "./targeting";
 import { watch } from "./watch";
-import { rubricTotal } from "./types";
+import { adherence, winTotal, type Culprit } from "./types";
 
 function usage(): never {
   console.error("usage: apply <target|diagnose|eval|suggest> <lessonId> [promptName]");
+  console.error("       apply approve <proposalId>");
   console.error("       apply watch");
   process.exit(1);
 }
 
 function scorecard(cases: EvalCase[]): string {
-  const header = "case                          kind    base  cand     Δ  verdict";
+  const header = "case                          kind    base  cand     Δ  verdict   adherence";
   const rows = cases.map((c) => {
-    const base = rubricTotal(c.baseline);
-    const cand = rubricTotal(c.candidate);
+    const base = winTotal(c.baseline);
+    const cand = winTotal(c.candidate);
     const delta = cand - base;
     return [
       c.caseId.slice(0, 28).padEnd(28),
@@ -27,7 +35,8 @@ function scorecard(cases: EvalCase[]): string {
       String(base).padStart(5),
       String(cand).padStart(5),
       (delta > 0 ? `+${delta}` : String(delta)).padStart(6),
-      `  ${c.verdict}`,
+      `  ${c.verdict.padEnd(7)}`,
+      `  ${adherence(c.baseline)}->${adherence(c.candidate)}`,
     ].join(" ");
   });
   return [header, ...rows].join("\n");
@@ -48,14 +57,28 @@ async function cmdTarget(lessonId: ObjectId): Promise<void> {
   }
 }
 
+function undeclaredLine(culprit: Culprit): string {
+  const hits = culprit.undeclared ?? [];
+  if (hits.length === 0) return "(none found)";
+  return hits.map((h) => `${h.prompt}.${h.fragment} [${h.kind} ${h.score.toFixed(2)}]`).join(", ");
+}
+
 async function cmdDiagnose(lessonId: ObjectId, promptName: string): Promise<void> {
   const lesson = await loadLesson(lessonId);
   const culprit = await findCulprit(lesson, await loadPrompt(promptName));
   console.log(`fragment:   ${culprit.fragment}`);
   console.log(`span:       "${culprit.span}"`);
   console.log(`declared:   ${culprit.sharedWith.length > 0 ? culprit.sharedWith.join(", ") : "(prompt-local)"}`);
+  console.log(`undeclared: ${undeclaredLine(culprit)}`);
   console.log(`traces:     ${culprit.traceIds.length}`);
   console.log(`rationale:  ${culprit.rationale}`);
+}
+
+async function cmdApprove(proposalId: ObjectId): Promise<void> {
+  const result = await approveProposal(proposalId);
+  console.log(
+    `approved ${proposalId.toHexString()} — ${result.prompt} is now v${result.version} (fragment "${result.fragment}", hash ${result.contentHash.slice(0, 12)})`,
+  );
 }
 
 async function cmdEval(lessonId: ObjectId, promptName: string): Promise<void> {
@@ -97,6 +120,7 @@ async function cmdSuggest(lessonId: ObjectId, promptName?: string): Promise<void
     console.log(`=== ${outcome.prompt} — ${outcome.status.toUpperCase()} ===`);
     if (outcome.culprit) {
       console.log(`culprit: ${outcome.culprit.fragment} -> "${outcome.culprit.span}"`);
+      console.log(`undeclared: ${undeclaredLine(outcome.culprit)}`);
       console.log(
         `declared: ${outcome.culprit.sharedWith.length > 0 ? outcome.culprit.sharedWith.join(", ") : "(prompt-local)"}`,
       );
@@ -119,6 +143,10 @@ async function main(): Promise<void> {
     return;
   }
   if (!lessonArg) usage();
+  if (command === "approve") {
+    await cmdApprove(new ObjectId(lessonArg));
+    return;
+  }
   const lessonId = new ObjectId(lessonArg);
   if (command === "target") await cmdTarget(lessonId);
   else if (command === "suggest") await cmdSuggest(lessonId, promptName);

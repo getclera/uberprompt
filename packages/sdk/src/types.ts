@@ -133,11 +133,19 @@ export interface LessonDoc {
   ts: Date;
 }
 
+export interface UndeclaredHit {
+  prompt: string;
+  fragment: string;
+  score: number;
+  kind: "semantic" | "literal";
+}
+
 export interface ProposalCulprit {
   fragment: string;
   span: string;
   traceIds: ObjectId[];
   sharedWith: string[];
+  undeclared?: UndeclaredHit[];
 }
 
 export interface ProposalEvals {
