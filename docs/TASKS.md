@@ -15,7 +15,9 @@ branches listed in IDEA.md instead of rewriting.
 ## The four main tasks
 - [ ] (unclaimed) 1 — Trace ingestion: SDK tracedCall + demo app generating traces
 - [ ] (unclaimed) 2 — Analyze/learn: trace batches → lessons (embedded, deduped)
-- [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
+- [ ] (shlok) 3 — Apply: lesson → culprit → candidate → **eval gate** → proposal.
+      Stage 3 emits proposals only; it never writes `prompts`. OWNER CHANGE: IDEA.md
+      had `owner: talwe` — talwe, ack or push back on this PR before it merges.
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
 - [ ] (unclaimed) Dashboard: pipeline view of the 4 stages + graph + proposal inbox
 
