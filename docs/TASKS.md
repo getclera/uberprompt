@@ -19,7 +19,12 @@ branches listed in IDEA.md instead of rewriting.
   - Still missing for stage 1: the `spans` collection, and a **unique index on
     `traces.traceId`** (the `$merge` key — without it the rollup duplicates instead of
     updating). Created by the stage 1 `init` subcommand.
-- [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
+- [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY. Present now:
+  OPENAI_API_KEY, VOYAGE_API_KEY (stage 2 runs on OpenAI because of this).
+  - **Gotcha — the VOYAGE_API_KEY is Atlas-issued**: it only authenticates against
+    `https://ai.mongodb.com/v1/embeddings`, NOT `api.voyageai.com` (403 there,
+    verified Aug 13). `packages/sdk/src/embeddings.ts` still points at
+    api.voyageai.com and will 403 with this key.
 - [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
@@ -35,7 +40,9 @@ branches listed in IDEA.md instead of rewriting.
   - [ ] `init` / `collect` / `tail` subcommands on the existing `packages/cli`.
   - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
-- [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
+- [x] (talwe+claude — done pending merge, branch `claude/stage2-learn`) 2 — Analyze/learn:
+  trace batches → lessons (embedded, deduped) as `uberprompt learn` (on-demand,
+  the demo's "hit analyze" button; OpenAI `gpt-5.1` default, `--model` override)
 - [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
