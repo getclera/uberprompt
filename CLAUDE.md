@@ -61,7 +61,8 @@ If not, push the doc fix (doc-only fixes may go straight to main).
 - **NEVER force-push `main` — no exceptions, it overwrites teammates' code.**
   `--force-with-lease` is allowed only on your own feature branch (e.g. after a
   rebase), never on main, never on a branch someone else may be using.
-- Doc-only fixes may go straight to main (normal push).
+- **NEVER push directly to `main` — everything goes through a PR**, docs included.
+  Rebase your branch on origin/main, push the branch, open the PR, merge fast.
 - Secrets live in `.env` (gitignored). Never commit or print credential values.
 
 ## Keep the main session free — delegate everything heavy
@@ -88,8 +89,9 @@ talks to you. It should never be blocked grinding on a long task.
 TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashboard),
 `apps/agent` (sync agent), `apps/demo` (demo app that generates traces).
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
-Embeddings: Voyage AI. LLM: Claude API (`@anthropic-ai/sdk`), model `claude-opus-5`,
-adaptive thinking (default — don't pass a `thinking` config or sampling params).
+Embeddings: Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite, 1024d).
+LLM: **OpenAI** (`openai` npm pkg, `OPENAI_API_KEY` in .env) — there is NO Anthropic
+key; don't write `@anthropic-ai/sdk` call paths. Backend first — dashboard is parked.
 
 ## Code standards (ported from clera-platform, hackathon-weight)
 

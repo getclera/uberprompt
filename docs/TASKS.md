@@ -30,10 +30,10 @@ branches listed in IDEA.md instead of rewriting.
   - Contract in IDEA.md. Next: `packages/tracing` (normalize, rollup, exporter, register),
     then `init` / `collect` / `tail` added as subcommands to the existing `packages/cli`,
     then the demo app emitting real traces.
-- [ ] (unclaimed) 2 — Analyze/learn: trace batches → lessons (embedded, deduped)
+- [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
 - [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
-- [ ] (unclaimed) Dashboard: pipeline view of the 4 stages + graph + proposal inbox
+- [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
 - [ ] (unclaimed) Wire end-to-end, dry-run the 4-min script in IDEA.md
