@@ -1,5 +1,6 @@
 import type { TraceDoc } from "@uberprompt/sdk";
 import { closeDb, tracesCol } from "@uberprompt/sdk";
+import { estimateCostUsd, formatUsd } from "../cost";
 
 function line(trace: TraceDoc): string {
   const bound = trace.promptName === undefined ? "unbound" : `${trace.promptName}@${trace.promptVersion}`;
@@ -14,6 +15,7 @@ function line(trace: TraceDoc): string {
     (trace.meta?.model ?? "-").padEnd(18),
     `${String(trace.meta?.latencyMs ?? 0).padStart(6)}ms`,
     `tok ${usage.padEnd(11)}`,
+    formatUsd(estimateCostUsd(trace.meta?.model ?? "", tokens)).padStart(9),
     `spans ${String(trace.spanCount ?? 0).padStart(3)}`,
     status,
   ].join("  ");
