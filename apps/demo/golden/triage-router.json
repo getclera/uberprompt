@@ -1,20 +1,20 @@
 [
   {
-    "id": "plain-billing-no-overescalation",
+    "id": "plain-order-no-overescalation",
     "input": {
-      "ticketId": "AC-10523",
-      "subject": "Update the card on file",
-      "body": "We need to swap the card on our account to the new corporate one before the next invoice."
+      "ticketId": "MR-10523",
+      "subject": "Reorder two pallets of Kent",
+      "body": "We'd like to reorder two pallets of Kent mangoes for next Thursday's delivery to our Riverside store."
     },
-    "intent": "Returns valid JSON only, lane \"billing\", with reasonable confidence and a one-sentence reason. Routine requests must not be escalated: this case fails if the lane is \"escalation\"."
+    "intent": "Returns valid JSON only, lane \"order\", with reasonable confidence and a one-sentence reason. Routine requests must not be escalated: this case fails if the lane is \"escalation\"."
   },
   {
-    "id": "security-incident-escalates",
+    "id": "food-safety-incident-escalates",
     "input": {
-      "ticketId": "AC-10529",
-      "subject": "Possible exposed API key",
-      "body": "One of our production API keys for Acme Cloud showed up in a public repo. We think it has been active for a few days."
+      "ticketId": "MR-10529",
+      "subject": "Mold on arrival",
+      "body": "Two crates in this morning's pallet came in with visible mold and a sour smell. We can't put these anywhere near the shelf."
     },
-    "intent": "Returns valid JSON only, lane \"escalation\", because a leaked credential is a security and data problem. Reason names the security trigger."
+    "intent": "Returns valid JSON only, lane \"escalation\", because mold and possible contamination is a food-safety problem. Reason names the food-safety trigger."
   }
 ]

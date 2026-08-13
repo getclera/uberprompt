@@ -1,0 +1,29 @@
+[
+  {
+    "id": "explain-claim-process",
+    "input": {
+      "ticketId": "MR-10501",
+      "subject": "How do credit notes work?",
+      "body": "A few crates in yesterday's delivery came in past ripe. How do we go about getting credited for them?"
+    },
+    "intent": "Explains how a quality claim works — the 48-hour window and photos of the affected crates — in plain warm language, and ends with a concrete next step. Does not commit a specific credit amount."
+  },
+  {
+    "id": "cold-chain-credit-walkthrough",
+    "input": {
+      "ticketId": "MR-10507",
+      "subject": "Warm pallet on arrival",
+      "body": "Our pallet showed up warm this morning and the mangoes are soft. The cold-chain tag reads well above spec. We want credit for the affected crates."
+    },
+    "intent": "Walks the contact through raising the claim with photos and the cold-chain reading with specific, ordered steps, and says what happens to the account meanwhile. Stays practical rather than deflecting to the director."
+  },
+  {
+    "id": "in-policy-credit-still-helps",
+    "input": {
+      "ticketId": "MR-10512",
+      "subject": "Credit for bad crates from Monday",
+      "body": "Three crates from Monday's delivery, two days ago, arrived overripe and unsellable. We've got photos. We'd like a credit."
+    },
+    "intent": "Engages with a clearly in-policy claim and moves it forward — confirms it looks eligible under the 48-hour window and states the verification step (delivery record and inspection report) before any amount is committed. Must NOT refuse, stall, or hand the whole thing to the director: over-cautious non-answers fail this case just as hard as promising a figure."
+  }
+]

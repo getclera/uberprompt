@@ -1,16 +1,18 @@
-# Customer Support Crew — demo prompt set
+# Mango Republic Crew — demo prompt set
 
-A small, realistic crew of support prompts for **Acme Cloud** (a fictional SaaS).
-It seeds the überprompt dependency graph with a spread of shared fragments,
-prompt-local fragments, and — deliberately — two **undeclared semantic
+A small, realistic crew of prompts for **Mango Republic**, a mango wholesaler and
+importer that sells crates and pallets to supermarkets, juice factories, and
+restaurants. It seeds the überprompt dependency graph with a spread of shared
+fragments, prompt-local fragments, and — deliberately — two **undeclared semantic
 dependencies** the sync agent is meant to discover on its own.
 
 The crew:
 
-- **triage-router** — classifies an inbound ticket into `billing | tech | escalation`, outputs JSON.
-- **billing-agent** — answers billing questions and refund requests.
-- **tech-support-agent** — troubleshoots product issues.
-- **escalation-writer** — writes internal escalation summaries for humans.
+- **triage-router** — classifies an inbound message into `order | refund | quality | escalation`, outputs JSON.
+- **order-agent** — handles new orders, reorders, pallet/crate pricing, and delivery slots.
+- **refund-agent** — handles credit notes and refunds for shipments that arrived in bad shape.
+- **quality-agent** — handles quality complaints (overripe on arrival, cold-chain break, wrong ripeness grade) and ripening-room advice.
+- **escalation-writer** — writes internal escalation summaries for the sales director.
 - **satisfaction-summarizer** — summarizes resolved conversations + sentiment.
 
 ## File format
@@ -30,7 +32,7 @@ Reusable text shared across prompts. One fragment per file.
 
 ```json
 {
-  "name": "billing-agent",
+  "name": "refund-agent",
   "version": 1,
   "template": "{{brand-voice}}\n{{task}}\n{{refund-policy}}",
   "fragments": [ { "key": "task", "text": "…" } ],
@@ -63,8 +65,9 @@ skip empty-text fragments.
 | Prompt | brand-voice | refund-policy | escalation-criteria | output-format |
 |---|:---:|:---:|:---:|:---:|
 | triage-router | | | | ✓ |
-| billing-agent | ✓ | ✓ | | ✓ |
-| tech-support-agent | ✓ | | | ✓ |
+| order-agent | ✓ | | | ✓ |
+| refund-agent | ✓ | ✓ | | ✓ |
+| quality-agent | ✓ | | | ✓ |
 | escalation-writer | ✓ | | ✓ | ✓ |
 | satisfaction-summarizer | | | | ✓ |
 
@@ -75,13 +78,13 @@ its own words, so the declared graph misses the link — the sync agent must fin
 it via fragment similarity, and flag drift when the shared source changes.
 
 1. **triage-router → escalation-criteria.** The local `routing-rules` fragment
-   paraphrases the shared escalation criteria (legal threats, security/data
-   issues, churn risk on high-value accounts, repeated contacts) inline instead
-   of referencing `escalation-criteria`.
+   paraphrases the shared escalation criteria (food-safety triggers, churn risk
+   on a high-value account, three-plus repeated contacts, legal/press/health-
+   authority threats) inline instead of referencing `escalation-criteria`.
 2. **escalation-writer → refund-policy.** The local `context` fragment loosely
-   restates parts of the refund policy (30-day window, pro-rated subscriptions,
-   large refunds needing lead approval, never promise an amount) without using
-   the shared `refund-policy` fragment.
+   restates parts of the refund policy (48-hour claim window, per-crate
+   crediting, large credits needing sales-director approval, never promise an
+   amount) without using the shared `refund-policy` fragment.
 
 ## Demo scenarios
 
@@ -93,9 +96,9 @@ node apps/demo/scenarios/apply.mjs raise-escalation-threshold --revert # undo
 ```
 
 `raise-escalation-threshold` bumps the churn-risk threshold in
-`escalation-criteria` from $5k to $10k ARR (version bump included). The declared
-graph only reaches `escalation-writer`; the sync agent must *infer* that
-`triage-router.routing-rules` paraphrases the old threshold and propose the fix.
-Each scenario's `expected` block is the acceptance test for the inference, and
-`ticket.json` is a $7k churn probe whose routing flips once the inferred
-proposal is applied.
+`escalation-criteria` from $50,000 to $100,000 per year (version bump included).
+The declared graph only reaches `escalation-writer`; the sync agent must *infer*
+that `triage-router.routing-rules` paraphrases the old threshold and propose the
+fix. Each scenario's `expected` block is the acceptance test for the inference,
+and `ticket.json` is a $70k FreshMart churn probe whose routing flips from
+`escalation` to `order` once the inferred proposal is applied.

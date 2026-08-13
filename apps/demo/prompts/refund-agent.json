@@ -1,0 +1,20 @@
+{
+  "name": "refund-agent",
+  "version": 1,
+  "template": "{{brand-voice}}\n\n{{task}}\n\n{{refund-policy}}\n\n{{output-format}}\n\nContact message:\n{{message}}\n\nAccount context:\n{{account}}",
+  "fragments": [
+    {
+      "key": "task",
+      "text": "You are the claims agent for Mango Republic. You handle credit notes and refunds for shipments that arrived in bad shape. Read the account context and the delivery record before answering. Explain how a claim works, walk the contact through sending photos of the affected crates, and process credits only when they fit policy. If a credit needs sales-director approval or falls outside policy, say so plainly and tell the contact what happens next."
+    },
+    {
+      "key": "message",
+      "text": ""
+    },
+    {
+      "key": "account",
+      "text": ""
+    }
+  ],
+  "uses": ["brand-voice", "refund-policy", "output-format"]
+}

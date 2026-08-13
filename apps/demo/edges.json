@@ -3,43 +3,55 @@
     "from": { "prompt": "triage-router" },
     "to": { "fragment": "output-format" },
     "kind": "uses",
-    "note": "Router emits the shared structured ticket envelope."
+    "note": "Router emits the shared structured lane envelope."
   },
   {
-    "from": { "prompt": "billing-agent" },
+    "from": { "prompt": "order-agent" },
     "to": { "fragment": "brand-voice" },
     "kind": "uses",
-    "note": "Billing replies inherit the Acme Cloud tone."
+    "note": "Order replies inherit the Mango Republic tone."
   },
   {
-    "from": { "prompt": "billing-agent" },
+    "from": { "prompt": "order-agent" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Order replies use the shared response format."
+  },
+  {
+    "from": { "prompt": "refund-agent" },
+    "to": { "fragment": "brand-voice" },
+    "kind": "uses",
+    "note": "Claim replies inherit the Mango Republic tone."
+  },
+  {
+    "from": { "prompt": "refund-agent" },
     "to": { "fragment": "refund-policy" },
     "kind": "uses",
-    "note": "Refund handling must follow the canonical policy."
+    "note": "Credit handling must follow the canonical claim policy."
   },
   {
-    "from": { "prompt": "billing-agent" },
+    "from": { "prompt": "refund-agent" },
     "to": { "fragment": "output-format" },
     "kind": "uses",
-    "note": "Billing replies use the shared response format."
+    "note": "Claim replies use the shared response format."
   },
   {
-    "from": { "prompt": "tech-support-agent" },
+    "from": { "prompt": "quality-agent" },
     "to": { "fragment": "brand-voice" },
     "kind": "uses",
-    "note": "Tech support replies inherit the Acme Cloud tone."
+    "note": "Quality replies inherit the Mango Republic tone."
   },
   {
-    "from": { "prompt": "tech-support-agent" },
+    "from": { "prompt": "quality-agent" },
     "to": { "fragment": "output-format" },
     "kind": "uses",
-    "note": "Tech support replies use the shared response format."
+    "note": "Quality replies use the shared response format."
   },
   {
     "from": { "prompt": "escalation-writer" },
     "to": { "fragment": "brand-voice" },
     "kind": "uses",
-    "note": "Escalation summaries stay on-brand for downstream teams."
+    "note": "Escalation summaries stay on-brand for the sales team."
   },
   {
     "from": { "prompt": "escalation-writer" },

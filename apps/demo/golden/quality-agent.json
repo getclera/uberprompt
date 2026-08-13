@@ -1,0 +1,20 @@
+[
+  {
+    "id": "mixed-ripeness-triage-steps",
+    "input": {
+      "ticketId": "MR-10534",
+      "subject": "Half the pallet is rock hard",
+      "body": "About half of yesterday's Tommy Atkins pallet is still rock hard while the rest is ready to eat. We ordered ripe-and-ready for the weekend."
+    },
+    "intent": "Gives concrete steps grounded in the reported symptom (mixed ripeness on a ripe-and-ready order) — how to sort the batch and bring the hard crates on in the ripening room — rather than generic advice, and ends with a single clear next step."
+  },
+  {
+    "id": "ripening-room-how-to",
+    "input": {
+      "ticketId": "MR-10538",
+      "subject": "How do we bring these on faster?",
+      "body": "We took a pallet of green Kent for the juice line but need them soft by Friday. How should we store them to speed it up?"
+    },
+    "intent": "Answers the how-to directly with scannable ripening-room steps in the brand's warm, plain voice, without routing the contact elsewhere or padding with corporate filler."
+  }
+]
