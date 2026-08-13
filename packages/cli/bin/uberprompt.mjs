@@ -23,9 +23,9 @@ function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--apply" || a === "--staged" || a === "--json") {
+    if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run" || a === "--all") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -83,6 +83,16 @@ Commands:
                         you see whether a new prompt version actually helped.
                           --json
 
+  propose               Consume unprocessed lessons into pending proposals via
+                        the targeting ladder (lineage -> catalog -> RAG).
+                          --dry-run        print without writing anything
+                          --model <m>      LLM to use (default gpt-5.1)
+  proposals             List pending proposals with a compact old->new diff.
+                          --all            include applied and rejected too
+  approve <id>          Apply a proposal: snapshot to prompt_versions, rewrite
+                        the fragment, bump the version, re-embed via Voyage.
+  reject <id>           Mark a pending proposal rejected.
+
   help                  Show this message.
 
 Global:
@@ -114,6 +124,22 @@ async function main() {
     case "tail":
     case "compare":
       return await runTracing(cmd, root, opts);
+    case "propose": {
+      const { runPropose } = await import("../src/propose.mjs");
+      return await runPropose(root, opts);
+    }
+    case "proposals": {
+      const { runProposals } = await import("../src/proposals.mjs");
+      return await runProposals(root, opts);
+    }
+    case "approve": {
+      const { runApprove } = await import("../src/review.mjs");
+      return await runApprove(root, opts._[1]);
+    }
+    case "reject": {
+      const { runReject } = await import("../src/review.mjs");
+      return await runReject(root, opts._[1]);
+    }
     case "help":
     case undefined:
       console.log(HELP);
@@ -125,4 +151,10 @@ async function main() {
   }
 }
 
-main().then((code) => process.exit(code || 0));
+main().then(
+  (code) => process.exit(code || 0),
+  (err) => {
+    console.error(`error: ${err.message}`);
+    process.exit(1);
+  }
+);

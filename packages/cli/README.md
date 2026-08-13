@@ -34,6 +34,20 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
   prompt/fragment files to graph nodes and report the affected dependents (with via-path + edge
   kind). Default compares the working tree against `HEAD`. Always exits 0.
   `--json` for machine output.
+- **`propose [--dry-run] [--model gpt-5.1]`** — stage 3. Consume lessons with no
+  `processedAt` from Mongo, target prompts via the ladder (lineage `appliesTo` →
+  catalog LLM pass → `$vectorSearch` over `descriptions_embedding`), and file
+  minimal-rewrite proposals (one per prompt+fragment, identical pending dupes
+  skipped). Stamps `lesson.processedAt`. `--dry-run` writes nothing. Needs
+  `MONGODB_URI`, `MONGODB_DB`, `OPENAI_API_KEY`.
+- **`proposals [--all]`** — list pending (default) or all proposals with a
+  compact word-level old→new diff.
+- **`approve <id>` / `reject <id>`** — approve snapshots the current prompt into
+  `prompt_versions` (with `contentHash`), applies `newText` to the target
+  fragment, bumps the version, re-embeds the fragment via Voyage
+  (`ai.mongodb.com`, voyage-3.5-lite), and marks the proposal `applied` — this
+  version bump is what triggers the stage-4 sync check. Reject just flips the
+  status. Approve also needs `VOYAGE_API_KEY`.
 - **`infer [--apply] [--threshold 0.7]`** — ask the model (`gpt-5-nano`) for
   undeclared **semantic** edges: fragments that restate/paraphrase/constrain the
   same rule such that editing one should trigger review of the other. Prints
