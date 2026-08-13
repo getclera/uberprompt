@@ -39,6 +39,12 @@ function loadPricing(): Record<string, ModelPricing> {
   return pricingCache;
 }
 
+// Test seam: the pricing override is read from the environment and cached for the
+// process, so a test that changes it needs a way to drop the cached copy.
+export function resetPricingCache(): void {
+  pricingCache = undefined;
+}
+
 export function pricingFor(model: string): ModelPricing | undefined {
   const pricing = loadPricing();
   const exact = pricing[model];
