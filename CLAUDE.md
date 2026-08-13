@@ -13,6 +13,23 @@ the idea, architecture, and data model. `docs/TASKS.md` is the live task board.
 - Claim work in `docs/TASKS.md` (name next to task), push the claim before starting,
   check off tasks as you finish.
 
+## Docs are the team's shared memory — keep them current, always
+
+The docs are how humans AND every Claude session stay in sync. A change that isn't
+reflected in the docs doesn't exist for the rest of the team. After anything you do,
+update the matching doc **in the same PR / push** — never "later":
+
+- Finished, started, or abandoned a task → update `docs/TASKS.md` (claim/check/unclaim).
+- Made or changed a decision (architecture, scope, naming, stack, schema) →
+  update `docs/IDEA.md`; schema changes go there BEFORE the code change.
+- Learned something the next session needs (gotcha, workaround, env quirk,
+  "X doesn't work, we do Y instead") → add it to the relevant doc or CLAUDE.md.
+- Anything went differently than the docs say → fix the doc so it matches reality.
+  Stale docs are worse than no docs.
+
+End-of-turn check for every session: "does main's docs still describe reality?"
+If not, push the doc fix (doc-only fixes may go straight to main).
+
 ## Git workflow — merge early, merge often
 
 - Work on short-lived branches (`<name>/<task>`), one task per branch.
