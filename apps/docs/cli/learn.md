@@ -1,6 +1,6 @@
 # uberprompt learn
 
-Stage 2 of the pipeline: mine production traces into durable lessons — the agent's persistent memory.
+Stage 2 of the pipeline: mine production traces into durable lessons. Lessons are the agent's persistent memory.
 
 ## Usage
 
@@ -8,7 +8,7 @@ Stage 2 of the pipeline: mine production traces into durable lessons — the age
 uberprompt learn [--limit <n>] [--model <m>] [--dedup-threshold <t>] [--dry-run]
 ```
 
-Reads recent traces that carry a prompt binding (`promptName`), prioritizing signal — traces with an `error` or a `score` below 0.5 come first, most recent first. Traces are grouped by prompt, and one LLM call per group mines durable, generalizable lessons (never one-off incident reports). Each lesson is embedded via Voyage and vector-deduped against existing active lessons before insert.
+Reads recent traces that carry a prompt binding (`promptName`). Traces with an `error` or a `score` below 0.5 come first, most recent first. Traces are grouped by prompt, and one LLM call per group mines durable lessons, not one-off incident reports. Each lesson is embedded via Voyage and vector-deduped against existing active lessons before insert.
 
 ## Flags
 
@@ -44,13 +44,13 @@ uberprompt learn --dedup-threshold 0.95
 
 ## How it works
 
-1. Selects up to `--limit` traces with `{ promptName: { $exists: true } }` — error/low-score traces first, then the rest, both newest first
-2. Groups traces by `promptName` and asks the model for durable lessons per group — a healthy group yields zero lessons
+1. Selects up to `--limit` traces with `{ promptName: { $exists: true } }`: error/low-score traces first, then the rest, both newest first
+2. Groups traces by `promptName` and asks the model for durable lessons per group. A healthy group yields zero lessons
 3. Embeds each lesson text (Voyage, 1024-d)
-4. `$vectorSearch` on the `lessons_embedding` index finds the nearest active lesson; at or above the threshold the new lesson is **not** inserted — instead the existing lesson gains the new `sourceTraceIds` and `appliesTo` entries via `$addToSet`
+4. `$vectorSearch` on the `lessons_embedding` index finds the nearest active lesson. At or above the threshold the new lesson is **not** inserted; the existing lesson gains the new `sourceTraceIds` and `appliesTo` entries via `$addToSet`
 5. Otherwise inserts `{ text, reason, embedding, sourceTraceIds, appliesTo, status: "active", ts }`
 
-Vector dedup is the stage's idempotency mechanism: re-running `learn` over the same traces merges into existing lessons instead of duplicating them. Traces are never mutated. `processedAt` is never set here — stage 3 (`uberprompt propose`) stamps it when it consumes the lesson.
+Vector dedup is the stage's idempotency mechanism: re-running `learn` over the same traces merges into existing lessons instead of duplicating them. Traces are never mutated. `processedAt` is never set here. Stage 3 (`uberprompt propose`) stamps it when it consumes the lesson.
 
 ## Environment
 

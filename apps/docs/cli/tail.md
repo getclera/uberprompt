@@ -8,7 +8,7 @@ Print recent traces and stream new ones as they arrive.
 uberprompt tail
 ```
 
-Prints the most recent traces from the `traces` collection, then opens a MongoDB change stream to display new traces in real time as they are ingested.
+Prints the most recent traces from the `traces` collection. Then it opens a MongoDB change stream and prints new traces as they arrive.
 
 ## Output
 

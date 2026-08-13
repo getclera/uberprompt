@@ -8,9 +8,9 @@ Run an OTLP/HTTP receiver that accepts OpenTelemetry spans and writes them to Mo
 uberprompt collect [--port <n>] [--service <name>]
 ```
 
-Starts an HTTP server that accepts OTLP span exports on the standard `/v1/traces` endpoint. Incoming spans are normalized and written to the `spans` collection, then rolled up into the `traces` collection using the same pipeline as the in-process SDK exporter.
+Starts an HTTP server that accepts OTLP span exports on the standard `/v1/traces` endpoint. It normalizes incoming spans, writes them to `spans`, and rolls them up into `traces`. The rollup pipeline is the same one the in-process SDK exporter uses.
 
-This lets any application that speaks OTLP -- regardless of language or framework -- feed traces into the dependency graph.
+Any application that speaks OTLP can feed traces in, whatever the language.
 
 ## Flags
 

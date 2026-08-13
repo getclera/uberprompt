@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `uberprompt` CLI provides file-first tooling for prompt dependency management, trace ingestion, and semantic edge inference.
+`uberprompt` is the command-line tool for the prompt dependency graph, trace ingestion, and the proposal workflow.
 
 ## Installation
 
@@ -36,9 +36,15 @@ uberprompt <command>
 | [`collect`](/cli/collect) | Run an OTLP/HTTP span receiver |
 | [`tail`](/cli/tail) | Print recent traces and stream new ones |
 | [`learn`](/cli/learn) | Mine traces into deduped lessons (stage 2) |
+| [`compare`](/cli/compare) | Compare prompt versions by traces, error rate, latency |
+| [`propose`](/cli/propose) | Generate proposals from unprocessed lessons |
+| [`proposals`](/cli/proposals) | List pending proposals with inline diffs |
+| [`approve`](/cli/approve) | Apply a proposal (snapshot, rewrite, version bump) |
+| [`reject`](/cli/reject) | Mark a pending proposal as rejected |
+| [`sync-check`](/cli/sync-check) | Check dependents for contradictions after a version bump |
 
 ## Environment
 
-The CLI reads `MONGODB_URI` from `.env` at the repo root for commands that interact with the database (`init`, `collect`, `tail`).
+The CLI reads `MONGODB_URI` from `.env` at the repo root for commands that interact with the database (`init`, `collect`, `tail`, `learn`, `compare`, `propose`, `proposals`, `approve`, `reject`, `sync-check`).
 
 The `graph`, `affected`, and `infer` commands operate on the local file system (`apps/demo/` prompt and edge files) and do not require a database connection.

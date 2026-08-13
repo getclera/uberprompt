@@ -10,7 +10,7 @@ uberprompt graph [node]
 
 Without arguments, renders the full graph: prompts on the left, shared fragments on the right, connected by colored edge buses.
 
-With a `node` argument (a prompt name or fragment key), shows the impact tree for that specific node -- its direct and transitive dependencies and dependents.
+With a `node` argument (a prompt name or fragment key), shows the impact tree for that node: its direct and transitive dependencies and dependents.
 
 ## Flags
 

@@ -1,6 +1,6 @@
 # Getting Started
 
-überPrompt is a prompt management pipeline that traces LLM calls, builds a dependency graph between prompts and shared fragments, and keeps them semantically in sync.
+überPrompt traces your LLM calls and builds a dependency graph between prompts and shared fragments. When a prompt changes, it checks the graph and keeps dependent prompts consistent.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ cd -berprompt
 pnpm install --config.minimum-release-age=0
 ```
 
-The `--config.minimum-release-age=0` flag is required because some dependencies are newer than pnpm's default 24h supply-chain threshold.
+The `--config.minimum-release-age=0` flag is required. Some dependencies are younger than pnpm's default 24h supply-chain threshold and the install fails without it.
 
 ## Initialize the database
 
@@ -41,13 +41,13 @@ pnpm --filter demo exec node seed.mjs
 
 ## Start collecting traces
 
-Run the OTLP/HTTP receiver to accept spans from any OpenTelemetry-instrumented application:
+Run the OTLP/HTTP receiver. Any OpenTelemetry-instrumented app can send spans to it:
 
 ```bash
 pnpm --filter @uberprompt/cli exec uberprompt collect --port 4318
 ```
 
-Or, if your app uses the `@uberprompt/sdk`, call `registerUberprompt()` at startup to write spans directly to MongoDB without a separate collector.
+If your app uses `@uberprompt/sdk`, you can skip the collector. Call `registerUberprompt()` at startup and spans go straight to MongoDB.
 
 ## Watch traces arrive
 
