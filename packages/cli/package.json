@@ -7,8 +7,9 @@
     "uberprompt": "./bin/uberprompt.mjs"
   },
   "dependencies": {
-    "archy": "^1.0.0",
-    "openai": "^7.4.0"
+    "@ai-sdk/openai": "^4.0.41",
+    "ai": "^7.0.65",
+    "archy": "^1.0.0"
   },
   "scripts": {
     "test": "node --test"

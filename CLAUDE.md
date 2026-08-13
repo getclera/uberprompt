@@ -90,10 +90,12 @@ TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashbo
 `apps/agent` (sync agent), `apps/demo` (demo app that generates traces).
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
 Embeddings: Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite, 1024d).
-LLM: **OpenAI** (`openai` npm pkg, `OPENAI_API_KEY` in .env) — there is NO Anthropic
-key; don't write `@anthropic-ai/sdk` call paths. CLI `infer` uses `gpt-5-nano`.
-Default model **`gpt-5.1`**; cheap variant for bulk/low-stakes calls is
+LLM: **OpenAI via the Vercel AI SDK** (`ai` + `@ai-sdk/openai`, `OPENAI_API_KEY` in
+.env) — there is NO Anthropic key; don't write raw `openai` or `@anthropic-ai/sdk`
+call paths. Default model **`gpt-5.1`**; cheap variant for bulk/low-stakes calls is
 **`gpt-5.4-mini`** (`gpt-5.1-mini` does NOT exist on this key — 404s, verified).
+CLI `infer` uses `gpt-5-nano`. AI SDK calls are auto-traced to Mongo when the app
+runs `registerUberprompt()` (`@uberprompt/tracing`).
 
 ## Environment gotchas (verified the hard way — don't rediscover)
 

@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
 import { edgesCol, promptsCol, promptVersionsCol } from "./db";
 import { embed, embedMany } from "./embeddings";
 import type { EdgeEndpoint, PromptDoc, PromptFragment } from "./types";
@@ -18,16 +19,6 @@ export interface DefinePromptArgs {
   updatedBy?: string;
 }
 
-let openai: OpenAI | undefined;
-
-function getOpenAI(): OpenAI {
-  if (!openai) {
-    if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
-    openai = new OpenAI();
-  }
-  return openai;
-}
-
 async function generateDescription(
   name: string,
   template: string,
@@ -37,20 +28,15 @@ async function generateDescription(
     .filter((f) => f.text.length > 0)
     .map((f) => `[${f.key}]\n${f.text}`)
     .join("\n\n");
-  const response = await getOpenAI().chat.completions.create({
-    model: DESCRIPTION_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: `Prompt "${name}".\n\nTemplate:\n${template}\n\nFragments:\n${body}\n\nWrite a one-line purpose description of this prompt: what it is for, under 25 words. Return only that line.`,
-      },
-    ],
+  const { text } = await generateText({
+    model: openai(DESCRIPTION_MODEL),
+    prompt: `Prompt "${name}".\n\nTemplate:\n${template}\n\nFragments:\n${body}\n\nWrite a one-line purpose description of this prompt: what it is for, under 25 words. Return only that line.`,
+    telemetry: { functionId: "sdk-generate-description" },
   });
-  const content = response.choices[0]?.message.content;
-  if (!content) {
+  if (text.trim().length === 0) {
     throw new Error(`${DESCRIPTION_MODEL} returned no description for "${name}"`);
   }
-  return content.trim();
+  return text.trim();
 }
 
 function fragmentsChanged(a: PromptFragment[], b: PromptFragment[]): boolean {
