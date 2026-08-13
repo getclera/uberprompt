@@ -83,6 +83,11 @@ talks to you. It should never be blocked grinding on a long task.
   wrong.
 - Subagents work in their own worktrees/branches; the main session reviews and
   merges their output.
+- The official MongoDB Agent Skills are vendored in `.claude/skills/` (from
+  https://github.com/mongodb/agent-skills, Apache-2.0). Use them for schema design,
+  query optimization, connection/driver setup, Atlas Search + Vector Search, and
+  natural-language querying instead of guessing at Mongo semantics. Refresh by
+  re-copying `skills/` from that repo.
 
 ## Stack (decided — don't relitigate mid-hackathon)
 
