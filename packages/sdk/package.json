@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx src/*.test.ts",
+    "test": "node --test --import tsx \"src/**/*.test.ts\"",
     "create-indexes": "tsx scripts/create-indexes.ts",
     "seed-demo": "tsx scripts/seed-demo.ts"
   },

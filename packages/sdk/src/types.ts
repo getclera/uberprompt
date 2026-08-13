@@ -9,6 +9,7 @@ export const COLLECTIONS = {
   lessons: "lessons",
   proposals: "proposals",
   evalRuns: "eval_runs",
+  syncState: "sync_state",
 } as const;
 
 export interface PromptFragment {
@@ -204,4 +205,10 @@ export interface EvalRunDoc {
   judgeModel: string;
   genModel: string;
   ts: Date;
+}
+
+export interface SyncStateDoc {
+  _id: string;
+  resumeToken: unknown;
+  updatedAt: Date;
 }

@@ -25,7 +25,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run" || a === "--all") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--against") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -92,6 +92,15 @@ Commands:
   approve <id>          Apply a proposal: snapshot to prompt_versions, rewrite
                         the fragment, bump the version, re-embed via Voyage.
   reject <id>           Mark a pending proposal rejected.
+  sync-check <prompt>   Stage 4: diff the prompt's current version against its
+                        latest prompt_versions snapshot, walk the Mongo edges
+                        graph for dependents of each changed fragment, LLM-check
+                        each for contradiction, and file source "sync-check"
+                        proposals for the ones that broke.
+                          --against <p.f>  also check this fragment as if it
+                                           were a dependent (demo/testing)
+                          --dry-run        print without writing anything
+                          --model <m>      LLM to use (default gpt-5.1)
 
   help                  Show this message.
 
@@ -139,6 +148,10 @@ async function main() {
     case "reject": {
       const { runReject } = await import("../src/review.mjs");
       return await runReject(root, opts._[1]);
+    }
+    case "sync-check": {
+      const { runSyncCheck } = await import("../src/sync-check.mjs");
+      return await runSyncCheck(root, opts._[1], opts);
     }
     case "help":
     case undefined:

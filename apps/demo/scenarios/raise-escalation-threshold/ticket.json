@@ -1,11 +1,11 @@
 {
-  "description": "Before/after probe ticket: $7k ARR churn risk. Sits between the old ($5k) and new ($10k) escalation thresholds, so triage-router's lane flips only after the inferred routing-rules fix is applied.",
+  "description": "Before/after probe ticket: $70k/year FreshMart account, churn risk. Sits between the old ($50k) and new ($100k) escalation thresholds, so triage-router's lane flips only after the inferred routing-rules fix is applied.",
   "promptName": "triage-router",
   "input": {
-    "ticketId": "AC-10488",
-    "from": "dana@brightloop.io",
-    "account": { "company": "Brightloop", "plan": "Team", "arr": 7000 },
-    "subject": "Considering cancelling — pricing no longer works for us",
-    "body": "Hi, we've been reviewing our tooling budget and Acme Cloud's renewal quote is hard to justify. Unless there's flexibility on pricing we'll likely cancel at the end of this billing period. Can someone walk me through our options?"
+    "ticketId": "MR-10488",
+    "from": "maria@freshmart.com",
+    "account": { "company": "FreshMart", "type": "supermarket chain", "annualValue": 70000 },
+    "subject": "Reviewing our supplier contract — pricing no longer works",
+    "body": "Hi, a competitor just quoted us about 15% less per pallet and we're reviewing our supplier contracts. Unless there's some flexibility on pallet pricing we may switch when this term is up. Can someone walk me through our options?"
   }
 }

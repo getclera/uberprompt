@@ -13,7 +13,9 @@
     "smoke": "tsx --env-file=../../.env scripts/smoke.ts",
     "smoke:otlp": "tsx --env-file=../../.env scripts/smoke-otlp.ts",
     "smoke:live": "tsx --env-file=../../.env scripts/smoke-live.ts",
-    "smoke:protobuf": "tsx --env-file=../../.env scripts/smoke-protobuf.ts"
+    "smoke:protobuf": "tsx --env-file=../../.env scripts/smoke-protobuf.ts",
+    "smoke:stream-error": "tsx --env-file=../../.env scripts/smoke-stream-error.ts",
+    "test": "node --test --import tsx \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@ai-sdk/otel": "^1.0.65",

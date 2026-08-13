@@ -5,7 +5,7 @@ import { loadGolden, runEval, summarizeCases, type RunEvalArgs } from "./evals";
 import { RUBRIC_AXES, WIN_AXES, type EvalCaseSpec } from "./types";
 
 const doc: PromptDoc = {
-  name: "billing-agent",
+  name: "refund-agent",
   version: 1,
   description: "test",
   fragments: [
@@ -78,11 +78,11 @@ function baseArgs(cases: EvalCaseSpec[]): RunEvalArgs {
   };
 }
 
-test("loadGolden loads the real billing-agent golden set from the repo root", async () => {
-  const cases = await loadGolden("billing-agent");
+test("loadGolden loads the real refund-agent golden set from the repo root", async () => {
+  const cases = await loadGolden("refund-agent");
   assert.equal(cases.length, 3);
   const ids = cases.map((c) => c.id);
-  assert.ok(ids.includes("in-policy-refund-still-helps"));
+  assert.ok(ids.includes("in-policy-credit-still-helps"));
   for (const goldenCase of cases) {
     assert.equal(typeof goldenCase.intent, "string");
     assert.ok(goldenCase.intent.length > 0);

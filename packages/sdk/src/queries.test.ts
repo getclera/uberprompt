@@ -57,9 +57,10 @@ test("buildDependentsPipeline matches prompt-and-fragment targets and clamps max
 test("declared uses edges resolve brand-voice dependents at depth 1", () => {
   const hits = flattenDependentsRows(directEdgesTo(demoEdges, "brand-voice"), 5);
   assert.deepEqual(hits, [
-    { prompt: "billing-agent", kind: "uses", depth: 1 },
     { prompt: "escalation-writer", kind: "uses", depth: 1 },
-    { prompt: "tech-support-agent", kind: "uses", depth: 1 },
+    { prompt: "order-agent", kind: "uses", depth: 1 },
+    { prompt: "quality-agent", kind: "uses", depth: 1 },
+    { prompt: "refund-agent", kind: "uses", depth: 1 },
   ]);
 });
 
@@ -67,8 +68,8 @@ test("semantic edges surface prompt-local fragment dependents of refund-policy",
   const allEdges = [...demoEdges, ...semanticFixture.edges];
   const hits = flattenDependentsRows(directEdgesTo(allEdges, "refund-policy"), 5);
   assert.deepEqual(hits, [
-    { prompt: "billing-agent", kind: "uses", depth: 1 },
     { prompt: "escalation-writer", fragment: "context", kind: "semantic", depth: 1 },
+    { prompt: "refund-agent", kind: "uses", depth: 1 },
   ]);
 });
 
@@ -233,6 +234,6 @@ test("lessons change stream filters inserts and threads the resume token", () =>
   const token = { _data: "8264" };
   assert.deepEqual(buildLessonsWatchOptions(token), {
     fullDocument: "updateLookup",
-    resumeAfter: token,
+    startAfter: token,
   });
 });

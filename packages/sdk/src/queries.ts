@@ -1,5 +1,5 @@
 import type { ChangeStreamOptions, ClientSession, Document } from "mongodb";
-import { edgesCol, evalRunsCol, getClient, getDb, lessonsCol, promptsCol } from "./db";
+import { edgesCol, evalRunsCol, getClient, getDb, lessonsCol, promptsCol, syncStateCol, tracesCol } from "./db";
 import { embed } from "./embeddings";
 import type { EdgeDoc, EdgeEndpoint, LessonDoc } from "./types";
 
@@ -370,10 +370,10 @@ export async function withTransaction<T>(fn: (session: ClientSession) => Promise
 
 export const LESSONS_WATCH_PIPELINE: Document[] = [{ $match: { operationType: "insert" } }];
 
-export function buildLessonsWatchOptions(resumeAfter?: unknown): ChangeStreamOptions {
+export function buildLessonsWatchOptions(startAfter?: unknown): ChangeStreamOptions {
   return {
     fullDocument: "updateLookup",
-    ...(resumeAfter !== undefined ? { resumeAfter } : {}),
+    ...(startAfter !== undefined ? { startAfter } : {}),
   };
 }
 
@@ -384,9 +384,9 @@ export interface LessonWatcher {
 
 export function watchLessons(
   onLesson: (lesson: LessonDoc, resumeToken: unknown) => void | Promise<void>,
-  opts: { resumeAfter?: unknown } = {},
+  opts: { startAfter?: unknown } = {},
 ): LessonWatcher {
-  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, buildLessonsWatchOptions(opts.resumeAfter));
+  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, buildLessonsWatchOptions(opts.startAfter));
   stream.on("change", (change) => {
     if (change.operationType === "insert" && change.fullDocument) {
       void onLesson(change.fullDocument, change._id);
@@ -396,4 +396,170 @@ export function watchLessons(
     resumeToken: () => stream.resumeToken,
     close: () => stream.close(),
   };
+}
+
+export async function loadResumeToken(watcherName: string): Promise<unknown> {
+  const doc = await syncStateCol().findOne({ _id: watcherName });
+  return doc?.resumeToken ?? undefined;
+}
+
+export async function saveResumeToken(watcherName: string, token: unknown): Promise<void> {
+  await syncStateCol().updateOne(
+    { _id: watcherName },
+    { $set: { resumeToken: token, updatedAt: new Date() } },
+    { upsert: true },
+  );
+}
+
+export async function watchLessonsResumable(
+  watcherName: string,
+  onLesson: (lesson: LessonDoc) => void | Promise<void>,
+): Promise<LessonWatcher> {
+  const token = await loadResumeToken(watcherName);
+  const opts: ChangeStreamOptions = {
+    fullDocument: "updateLookup",
+    ...(token !== undefined ? { startAfter: token } : {}),
+  };
+  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, opts);
+  stream.on("change", (change) => {
+    if (change.operationType === "insert" && change.fullDocument) {
+      void (async () => {
+        await onLesson(change.fullDocument);
+        await saveResumeToken(watcherName, change._id);
+      })();
+    }
+  });
+  return {
+    resumeToken: () => stream.resumeToken,
+    close: () => stream.close(),
+  };
+}
+
+export interface LatencyBucket {
+  _id: number | string;
+  count: number;
+  avgLatency: number;
+  errorCount: number;
+}
+
+export function buildLatencyHistogramPipeline(since: Date): Document[] {
+  return [
+    { $match: { ts: { $gte: since } } },
+    {
+      $bucket: {
+        groupBy: "$meta.latencyMs",
+        boundaries: [0, 100, 250, 500, 1000, 2500, 5000],
+        default: "5000+",
+        output: {
+          count: { $sum: 1 },
+          avgLatency: { $avg: "$meta.latencyMs" },
+          errorCount: { $sum: { $cond: [{ $ifNull: ["$error", false] }, 1, 0] } },
+        },
+      },
+    },
+  ];
+}
+
+export async function latencyHistogram(since: Date): Promise<LatencyBucket[]> {
+  return tracesCol().aggregate<LatencyBucket>(buildLatencyHistogramPipeline(since)).toArray();
+}
+
+export interface DashboardSummary {
+  latency: { p50: number; p95: number; p99: number } | null;
+  errorRate: { total: number; errors: number; rate: number } | null;
+  tokensByPrompt: Array<{ promptName: string; totalTokens: number }>;
+}
+
+export function buildDashboardSummaryPipeline(since: Date): Document[] {
+  return [
+    { $match: { ts: { $gte: since } } },
+    {
+      $facet: {
+        latency: [
+          {
+            $group: {
+              _id: null,
+              p50: { $percentile: { input: "$meta.latencyMs", p: [0.5], method: "approximate" } },
+              p95: { $percentile: { input: "$meta.latencyMs", p: [0.95], method: "approximate" } },
+              p99: { $percentile: { input: "$meta.latencyMs", p: [0.99], method: "approximate" } },
+            },
+          },
+          { $project: { _id: 0 } },
+        ],
+        errorRate: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              errors: { $sum: { $cond: [{ $ifNull: ["$error", false] }, 1, 0] } },
+            },
+          },
+          { $project: { _id: 0, total: 1, errors: 1, rate: { $divide: ["$errors", "$total"] } } },
+        ],
+        tokensByPrompt: [
+          { $match: { promptName: { $exists: true } } },
+          {
+            $group: {
+              _id: "$promptName",
+              totalTokens: { $sum: { $ifNull: ["$meta.tokens.totalTokens", 0] } },
+            },
+          },
+          { $project: { _id: 0, promptName: "$_id", totalTokens: 1 } },
+          { $sort: { totalTokens: -1 } },
+        ],
+      },
+    },
+    {
+      $project: {
+        latency: { $ifNull: [{ $first: "$latency" }, null] },
+        errorRate: { $ifNull: [{ $first: "$errorRate" }, null] },
+        tokensByPrompt: 1,
+      },
+    },
+  ];
+}
+
+export async function dashboardSummary(since: Date): Promise<DashboardSummary> {
+  const [result] = await tracesCol()
+    .aggregate<DashboardSummary>(buildDashboardSummaryPipeline(since))
+    .toArray();
+  return result ?? { latency: null, errorRate: null, tokensByPrompt: [] };
+}
+
+export interface TimelineBucket {
+  ts: Date;
+  traceCount: number;
+  avgLatency: number;
+  errorCount: number;
+}
+
+export function buildTraceTimelinePipeline(since: Date, until: Date): Document[] {
+  return [
+    { $match: { ts: { $gte: since, $lte: until } } },
+    {
+      $group: {
+        _id: { $dateTrunc: { date: "$ts", unit: "hour" } },
+        traceCount: { $sum: 1 },
+        avgLatency: { $avg: "$meta.latencyMs" },
+        errorCount: { $sum: { $cond: [{ $ifNull: ["$error", false] }, 1, 0] } },
+      },
+    },
+    { $project: { _id: 0, ts: "$_id", traceCount: 1, avgLatency: 1, errorCount: 1 } },
+    { $sort: { ts: 1 } },
+    { $densify: { field: "ts", range: { step: 1, unit: "hour", bounds: [since, until] } } },
+    {
+      $fill: {
+        sortBy: { ts: 1 },
+        output: {
+          traceCount: { value: 0 },
+          avgLatency: { value: 0 },
+          errorCount: { value: 0 },
+        },
+      },
+    },
+  ];
+}
+
+export async function traceTimeline(since: Date, until: Date): Promise<TimelineBucket[]> {
+  return tracesCol().aggregate<TimelineBucket>(buildTraceTimelinePipeline(since, until)).toArray();
 }

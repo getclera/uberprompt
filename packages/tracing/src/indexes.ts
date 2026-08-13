@@ -15,6 +15,17 @@ export async function ensureTracingIndexes(): Promise<string[]> {
   created.push(await tracesCol().createIndex({ promptVersionId: 1, ts: -1 }));
   created.push(await promptVersionsCol().createIndex({ promptName: 1, version: 1 }, { unique: true }));
   created.push(await promptVersionsCol().createIndex({ contentHash: 1 }));
+  created.push(await spansCol().createIndex({ "attributes.$**": 1 }));
+  created.push(await spansCol().createIndex({ "resource.$**": 1 }));
+
+  created.push(await spansCol().createIndex(
+    { ingestedAt: 1 },
+    { expireAfterSeconds: 60 * 60 * 24 * 30 }
+  ));
+  created.push(await tracesCol().createIndex(
+    { ts: 1 },
+    { expireAfterSeconds: 60 * 60 * 24 * 90 }
+  ));
 
   return created;
 }
