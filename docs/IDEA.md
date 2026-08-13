@@ -333,7 +333,11 @@ type stripping (`node bin/uberprompt.ts`, Node >= 23.6) — no build step, no ts
   **resume token**, so a restart continues from the last lesson it saw instead of
   replaying or skipping. On boot it also drains the backlog (`status: "active"`,
   no `processedAt`), which covers lessons written while it was down. That is the
-  no-cold-start property, made concrete.
+  no-cold-start property, made concrete. `applyLesson` also re-checks
+  `processedAt` itself and short-circuits (log + return) when it is already set, so
+  a replayed insert event (crash / resume-token regression) can't file duplicate
+  proposals for a completed lesson; the manual `suggest` CLI passes `force` to
+  re-run one deliberately.
 - Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
   `descriptions_embedding` (function-level match, not literal text).
 - Dependency interface (fragment-level, used by stage 4):

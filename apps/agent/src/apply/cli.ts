@@ -113,7 +113,7 @@ async function cmdEval(lessonId: ObjectId, promptName: string): Promise<void> {
 }
 
 async function cmdSuggest(lessonId: ObjectId, promptName?: string): Promise<void> {
-  const result = await applyLesson(lessonId, promptName ? { only: promptName } : {});
+  const result = await applyLesson(lessonId, { force: true, ...(promptName ? { only: promptName } : {}) });
   console.log(`targets: ${result.targets.map((t) => `${t.prompt}[${t.rung}]`).join(", ")}\n`);
   for (const outcome of result.outcomes) {
     const last = outcome.reports[outcome.reports.length - 1];

@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { EvalRunSummary, ProposalDoc } from "@uberprompt/sdk";
-import { hasProposalFromLesson, isDuplicateProposal, proposalUpdate, shouldStampProcessed, type PromptOutcome } from "./index";
+import type { LessonDoc } from "@uberprompt/sdk";
+import { hasProposalFromLesson, isAlreadyProcessed, isDuplicateProposal, proposalUpdate, shouldStampProcessed, type PromptOutcome } from "./index";
 import type { Candidate } from "./types";
 
 const candidate: Candidate = { newText: "confirm the amount first", reason: "lesson L-1" };
@@ -107,6 +108,24 @@ function outcome(status: PromptOutcome["status"]): PromptOutcome {
 test("a lesson whose target failed outright is left unprocessed so a restart retries it", () => {
   assert.equal(shouldStampProcessed([outcome("pending"), outcome("failed")]), false);
   assert.equal(shouldStampProcessed([outcome("failed")]), false);
+});
+
+function lesson(processedAt?: Date): LessonDoc {
+  return {
+    _id: new ObjectId(),
+    text: "never promise a credit amount before checking the delivery record",
+    embedding: [0.1, 0.2],
+    sourceTraceIds: [],
+    appliesTo: ["refund-agent"],
+    status: "active",
+    ts: new Date(),
+    ...(processedAt ? { processedAt } : {}),
+  };
+}
+
+test("an already-processed lesson is recognised so a replayed insert event short-circuits", () => {
+  assert.equal(isAlreadyProcessed(lesson(new Date())), true);
+  assert.equal(isAlreadyProcessed(lesson()), false);
 });
 
 test("a lesson whose gate rejected every candidate is still processed once", () => {

@@ -55,6 +55,11 @@ branches listed in IDEA.md instead of rewriting.
   - [x] (shlok) Stage 3 agent (`apps/agent`): targeting ladder, culprit diagnosis with
         undeclared blast radius, eval gate, lessons change-stream watcher — un-benched
         from PR #8, now the live stage-3 path.
+  - [x] (felix) Change-stream reprocess guard: `applyLesson` now short-circuits when
+        `lesson.processedAt` is already set (log + return `processed: true`), so a
+        replayed insert event (crash / resume-token regression) can't file duplicate
+        LLM-driven proposals for a completed lesson. Manual `suggest` CLI passes
+        `force` to re-run deliberately. Backlog path already filtered `processedAt`.
   - [x] (shlok) Eval gate correctness: golden-only prompts can pass (a replay-less
         target used to fail unconditionally), judge failures count as ties instead of
         losses, baseline outputs are reused across retry attempts, and the win delta
