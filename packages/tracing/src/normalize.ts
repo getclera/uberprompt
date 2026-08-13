@@ -103,6 +103,15 @@ function extractOutput(attrs: Record<string, unknown>): string | undefined {
   );
 }
 
+function sanitizeKeys(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const safeKey = key.replaceAll(".", "__");
+    result[safeKey] = value;
+  }
+  return result;
+}
+
 export function toSpanDoc(raw: RawSpan, fallbackService: string): SpanDoc {
   const service = str(raw.resource, "service.name") ?? fallbackService;
   const doc: SpanDoc = {
@@ -115,8 +124,8 @@ export function toSpanDoc(raw: RawSpan, fallbackService: string): SpanDoc {
     endTime: raw.endTime,
     durationMs: raw.endTime.getTime() - raw.startTime.getTime(),
     status: raw.status,
-    attributes: raw.attributes,
-    resource: raw.resource,
+    attributes: sanitizeKeys(raw.attributes),
+    resource: sanitizeKeys(raw.resource),
     ingestedAt: new Date(),
   };
   if (raw.parentSpanId !== undefined) doc.parentSpanId = raw.parentSpanId;
