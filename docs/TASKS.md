@@ -6,6 +6,9 @@ branches listed in IDEA.md instead of rewriting.
 
 ## Setup
 - [ ] (talwe — HUMAN) Atlas cluster, db `uberprompt`, vector indexes, `.env` (MONGODB_URI, ANTHROPIC_API_KEY, VOYAGE_API_KEY)
+- [x] MongoDB MCP server wired in `.mcp.json` (project scope, `mongodb-mcp-server@latest`).
+      It reads `MDB_MCP_CONNECTION_STRING` from your shell env — export it (same value as
+      `MONGODB_URI`) before launching Claude, then approve the server when prompted.
 - [ ] (unclaimed) Re-land monorepo + SDK from `claude/sdk-scaffold` once plan is locked
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 
