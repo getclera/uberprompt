@@ -40,6 +40,10 @@ function makeLesson(traceIds: ObjectId[]): LessonDoc {
 function makeTrace(id: ObjectId): TraceDoc {
   return {
     _id: id,
+    traceId: `trace-${id.toHexString()}`,
+    service: "demo",
+    operation: "ai.generateText",
+    spanCount: 1,
     promptName: "billing-agent",
     promptVersion: 1,
     input: { subject: "Double charged" },
