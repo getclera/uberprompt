@@ -44,11 +44,13 @@ const LESSONS_TOOL: Tool = {
     "Report durable, generalizable lessons mined from production LLM traces of one prompt. Report an empty list when the traces show nothing recurring worth remembering.",
   parameters: {
     type: "object",
+    additionalProperties: false,
     properties: {
       lessons: {
         type: "array",
         items: {
           type: "object",
+          additionalProperties: false,
           properties: {
             text: { type: "string" },
             reason: { type: "string" },
