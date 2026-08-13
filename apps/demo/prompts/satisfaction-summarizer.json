@@ -1,0 +1,16 @@
+{
+  "name": "satisfaction-summarizer",
+  "version": 1,
+  "template": "{{task}}\n\n{{output-format}}\n\nResolved conversation:\n{{conversation}}",
+  "fragments": [
+    {
+      "key": "task",
+      "text": "You summarize resolved Acme Cloud support conversations for the quality log. Produce: a one-line summary of the issue and how it was resolved, the customer's sentiment (positive / neutral / negative) with a short reason, and one flag if anything still looks at risk of coming back. Keep it factual and brief — this feeds reporting, not the customer."
+    },
+    {
+      "key": "conversation",
+      "text": ""
+    }
+  ],
+  "uses": ["output-format"]
+}

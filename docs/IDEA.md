@@ -88,12 +88,31 @@ Database `uberprompt`, collections:
 Vector Search indexes: `fragments_embedding` on `prompts.fragments.embedding`,
 `lessons_embedding` on `lessons.embedding` (Voyage, cosine).
 
+## Prompt files (demo source format)
+
+Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
+
+- `apps/demo/fragments/<key>.json` — `{ key, version, text }`; shared fragments,
+  canonical (brand-voice, refund-policy, escalation-criteria, output-format).
+- `apps/demo/prompts/<name>.json` — `{ name, version, template,
+  fragments: [local {key,text}], uses: [shared keys] }`.
+- `apps/demo/edges.json` — declared `uses` edges.
+- `apps/demo/expected-semantic-edges.json` — ground truth the stage-4 inference
+  must discover (e.g. triage-router routing-rules ↔ escalation-criteria;
+  escalation-writer context ↔ refund-policy).
+- `apps/demo/traces.seed.json` — seed traces (incl. the seeded failures).
+
+Version = integer, bumped on every text change. The seed script inlines shared
+fragments into each prompt's `fragments` array to match the Mongo contract shape.
+A local fragment with empty `text` is a **runtime input slot** (`{{ticket}}`,
+`{{message}}`, …) — embedding and semantic-edge inference skip empty fragments.
+
 ## Demo script (~4 min)
 
-1. Prompt graph in the dashboard — 5 recruiting prompts, shared fragments, edges.
+1. Prompt graph in the dashboard — 5 support prompts (Acme Cloud), shared fragments, edges.
 2. Run the demo app → **stage 1**: traces stream in, some seeded failures.
-3. Hit analyze → **stage 2**: agent writes a lesson ("pressure language in first
-   outreach → negative replies").
+3. Hit analyze → **stage 2**: agent writes a lesson ("never promise a refund
+   amount before checking the account").
 4. **Stage 3**: lesson becomes a proposal; approve the diff → new prompt version.
 5. **Stage 4**: sync check ripples through the graph, files consistency proposals
    for dependent prompts; approve → graph goes quiet. Rerun app → better output.
