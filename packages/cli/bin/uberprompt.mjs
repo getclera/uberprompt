@@ -25,7 +25,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run" || a === "--all") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--against") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--to") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -89,18 +89,32 @@ Commands:
                           --model <m>      LLM to use (default gpt-5.1)
   proposals             List pending proposals with a compact old->new diff.
                           --all            include applied and rejected too
-  approve <id>          Apply a proposal: snapshot to prompt_versions, rewrite
-                        the fragment, bump the version, re-embed via Voyage.
+  approve <id>          Apply a proposal: snapshot pre + post versions to
+                        prompt_versions, rewrite the fragment, bump the version,
+                        re-embed via Voyage, then run the stage-4 sync check.
+                          --no-sync        skip the automatic sync check
   reject <id>           Mark a pending proposal rejected.
-  sync-check <prompt>   Stage 4: diff the prompt's current version against its
-                        latest prompt_versions snapshot, walk the Mongo edges
-                        graph for dependents of each changed fragment, LLM-check
-                        each for contradiction, and file source "sync-check"
-                        proposals for the ones that broke.
-                          --against <p.f>  also check this fragment as if it
-                                           were a dependent (demo/testing)
+  sync <p[.frag]>       Stage 4, manual run: diff the prompt's current version
+                        against its latest prompt_versions snapshot, walk the
+                        Mongo edges graph for dependents of each changed
+                        fragment, discover undeclared semantic edges via
+                        \$vectorSearch (cosine >= 0.80, top 5), LLM-check each
+                        dependent for contradiction, and file source
+                        "sync-check" proposals for the ones that broke.
                           --dry-run        print without writing anything
                           --model <m>      LLM to use (default gpt-5.1)
+  rollback <prompt>     Restore a prompt from a prompt_versions snapshot as a
+                        NEW version (history stays append-only): snapshot the
+                        current state, restore fragments + template, bump the
+                        version, re-embed changed fragments, run the sync check.
+                          --to <version>   snapshot to restore (default: previous)
+                          --dry-run        print without writing anything
+                          --no-sync        skip the automatic sync check
+  reembed               Re-embed every stored vector (prompt fragments,
+                        descriptions, lessons) via the current Voyage endpoint,
+                        then verify known-good similarity pairs. Run after an
+                        embedding-space drift.
+                          --dry-run        list what would be re-embedded
 
   help                  Show this message.
 
@@ -143,15 +157,23 @@ async function main() {
     }
     case "approve": {
       const { runApprove } = await import("../src/review.mjs");
-      return await runApprove(root, opts._[1]);
+      return await runApprove(root, opts._[1], opts);
     }
     case "reject": {
       const { runReject } = await import("../src/review.mjs");
       return await runReject(root, opts._[1]);
     }
-    case "sync-check": {
-      const { runSyncCheck } = await import("../src/sync-check.mjs");
-      return await runSyncCheck(root, opts._[1], opts);
+    case "sync": {
+      const { runSyncCommand } = await import("../src/sync.mjs");
+      return await runSyncCommand(root, opts._[1], opts);
+    }
+    case "rollback": {
+      const { runRollback } = await import("../src/rollback.mjs");
+      return await runRollback(root, opts._[1], opts);
+    }
+    case "reembed": {
+      const { runReembed } = await import("../src/reembed.mjs");
+      return await runReembed(root, opts);
     }
     case "help":
     case undefined:
