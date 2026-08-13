@@ -1,7 +1,0 @@
-{
-  "name": "uberprompt",
-  "private": true,
-  "scripts": {
-    "typecheck": "pnpm -r typecheck"
-  }
-}
