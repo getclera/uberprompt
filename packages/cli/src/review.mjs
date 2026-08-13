@@ -49,7 +49,7 @@ function bridgeApprove(cliRoot, id) {
   }
 
   const envFile = join(root, ".env");
-  const args = ["exec", "tsx"];
+  const args = ["--config.verify-deps-before-run=false", "exec", "tsx"];
   if (existsSync(envFile)) args.push(`--env-file=${envFile}`);
   args.push(entry, id);
 
