@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mongodb": {
+      "command": "sh",
+      "args": [
+        "-c",
+        "export MDB_MCP_CONNECTION_STRING=\"$(grep '^MONGODB_URI=' .env | cut -d= -f2- | tr -d '\"')\" && exec npx -y mongodb-mcp-server"
+      ]
+    }
+  }
+}
