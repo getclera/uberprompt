@@ -234,6 +234,6 @@ test("lessons change stream filters inserts and threads the resume token", () =>
   const token = { _data: "8264" };
   assert.deepEqual(buildLessonsWatchOptions(token), {
     fullDocument: "updateLookup",
-    resumeAfter: token,
+    startAfter: token,
   });
 });
