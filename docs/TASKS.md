@@ -42,7 +42,10 @@ branches listed in IDEA.md instead of rewriting.
   - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
 - [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
-- [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
+- [x] (shlok) 3 — Apply: lesson → culprit → candidate → eval gate → proposal.
+      Stage 3 emits proposals ONLY; it never writes `prompts` (verified: all prompts
+      still v1 after a full run). Contract addendum in PR #8. `pnpm --filter
+      @uberprompt/agent apply <diagnose|eval|suggest> <lessonId> <promptName>`.
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
