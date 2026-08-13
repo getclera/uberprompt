@@ -7,8 +7,8 @@
     "uberprompt": "./bin/uberprompt.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.68.0",
-    "archy": "^1.0.0"
+    "archy": "^1.0.0",
+    "openai": "^7.4.0"
   },
   "scripts": {
     "test": "node --test"

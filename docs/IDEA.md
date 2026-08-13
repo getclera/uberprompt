@@ -242,7 +242,7 @@ Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
 - `apps/demo/traces.seed.json` — seed traces (incl. the seeded failures).
 
 File-first tooling: `packages/cli` ships the **`uberprompt` CLI** — `infer`
-(Claude infers semantic edges from fragment texts → edges.json), `affected`
+(`gpt-5-nano` infers semantic edges from fragment texts → edges.json), `affected`
 (git-diff changed prompt/fragment files → transitive graph walk → impacted
 prompts), `graph` (print the graph). The stage-4 agent and the CLI share the
 same edges.json semantics.
