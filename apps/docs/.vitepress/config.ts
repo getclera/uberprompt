@@ -1,7 +1,7 @@
 import { defineConfig } from "vitepress";
 
 const BRAND_NAME = "überPrompt";
-const BRAND_HTML = '<span class="u-pink">ü</span>berPrompt';
+const BRAND_HTML = '<span class="u-pink">über</span>Prompt';
 
 export default defineConfig({
   title: BRAND_NAME,
@@ -21,6 +21,7 @@ export default defineConfig({
     pageData.frontmatter.brandHtml = BRAND_HTML;
   },
   themeConfig: {
+    siteTitle: " ",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "CLI Reference", link: "/cli/" },
