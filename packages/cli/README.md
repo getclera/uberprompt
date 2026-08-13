@@ -5,7 +5,14 @@ LLM calls go through the Vercel AI SDK (`ai` + `@ai-sdk/openai`, needed by `infe
 
 ## Install
 
-Run it directly:
+First install the dependencies (once, from `packages/cli` — `npm link` alone
+does not install them):
+
+```sh
+npm install
+```
+
+Then run it directly:
 
 ```sh
 node packages/cli/bin/uberprompt.mjs <command>
