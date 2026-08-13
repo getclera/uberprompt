@@ -8,7 +8,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
-    "archy": "^1.0.0"
+    "archy": "^1.0.0",
+    "mongodb": "^6.18.0",
+    "openai": "^6.9.0"
   },
   "scripts": {
     "test": "node --test"
