@@ -46,3 +46,18 @@ TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashbo
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
 Embeddings: Voyage AI. LLM: Claude API (`@anthropic-ai/sdk`), model `claude-opus-5`,
 adaptive thinking (default — don't pass a `thinking` config or sampling params).
+
+## Code standards (ported from clera-platform, hackathon-weight)
+
+- **Startup, not enterprise — keep it simple.** Handle only the important cases;
+  error loudly instead of adding silent fallbacks. No speculative abstraction, no
+  "might need it later" plumbing. Smallest change that solves the real problem —
+  but fully implement what you do build (no TODOs/placeholders).
+- **Zero comments.** Names + types say WHAT, the PR body says WHY.
+- **No `any`** — use `unknown`, `Record<string, unknown>`, or real types.
+- **Max ~400 lines per file.** Split into `index/handlers/types` when growing.
+- **Search before create** — grep `packages/sdk` before adding a util/type; reuse
+  over fork.
+- **No silent PASS.** Before claiming something works, show the command you ran and
+  its real output (typecheck, script run, curl). "It should work" doesn't count.
+- Rebase `origin/main` before every push.
