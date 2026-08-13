@@ -53,4 +53,20 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
-- [ ] (unclaimed) Wire end-to-end, dry-run the 4-min script in IDEA.md
+- [ ] (talwe+claude — in progress) Wire end-to-end, dry-run the 4-min script in IDEA.md
+  - Stage 3 verified live (Aug 13): approved proposal `6a7e40ee…` for real —
+    tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
+    evidence in `docs/PIPELINE-TEST.md`.
+  - Stage 3→4 seam (details + measurements in PIPELINE-TEST.md): felix's graph
+    functions (`buildGraph`/`dependentsOf`, packages/cli/src/graph.mjs) are pure
+    over `{prompts, edges}` — new `uberprompt sync-check <prompt>` feeds them
+    from Mongo via a thin adapter, diffs current vs latest `prompt_versions`
+    snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
+    Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
+    the answer-key neighbors judged consistent — loop converges quiet in wave 1.
+  - Still open at the seam: IDEA.md handoff section still says change-stream
+    (update to the call shape; chain sync-check onto approve); all embeddings
+    written before ~21:41Z Aug 13 (6 prompts + lesson 1) are orthogonal to the
+    current endpoint's space — semantic-edge discovery returns noise until
+    re-embedded; apps/demo JSON diverged from Mongo after the apply (files
+    still v1).
