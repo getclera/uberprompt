@@ -336,6 +336,22 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
 
 ## Prompt files (demo source format)
 
+The demo crew is **Mango Republic**, a mango wholesaler selling crates/pallets to
+supermarkets, juice factories, and restaurants. Six prompts:
+
+| Prompt | Job | Shared `uses` |
+|---|---|---|
+| `triage-router` | Classifies inbound into `order \| refund \| quality \| escalation`, JSON out | output-format |
+| `order-agent` | New orders, reorders, pallet pricing, delivery slots | brand-voice, output-format |
+| `refund-agent` | Credit notes / refunds for bad shipments | brand-voice, refund-policy, output-format |
+| `quality-agent` | Quality complaints (overripe, cold-chain, wrong grade), ripening advice | brand-voice, output-format |
+| `escalation-writer` | Internal escalation summaries for the sales director | brand-voice, escalation-criteria, output-format |
+| `satisfaction-summarizer` | Summarizes resolved conversations + sentiment | output-format |
+
+Planted undeclared semantic deps (what stage 4 must infer): `triage-router`'s
+local `routing-rules` paraphrases escalation-criteria (incl. the $50k/year churn
+threshold); `escalation-writer`'s local `context` restates refund-policy.
+
 Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
 
 - `apps/demo/fragments/<key>.json` — `{ key, version, text }`; shared fragments,
