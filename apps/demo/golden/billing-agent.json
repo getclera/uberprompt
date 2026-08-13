@@ -1,0 +1,29 @@
+[
+  {
+    "id": "explain-charge",
+    "input": {
+      "ticketId": "AC-10501",
+      "subject": "What is this $79 line on my invoice?",
+      "body": "My invoice this month has a $79 line I don't recognize next to the usual Pro plan charge. What is it?"
+    },
+    "intent": "Explains what the unfamiliar charge most likely is and how to confirm it against the account, in plain warm language, and ends with a concrete next step. Does not treat this as a refund request."
+  },
+  {
+    "id": "failed-payment-walkthrough",
+    "input": {
+      "ticketId": "AC-10507",
+      "subject": "Payment failed twice",
+      "body": "We got two emails saying our card was declined and now the dashboard shows a billing warning. The card works everywhere else."
+    },
+    "intent": "Walks the customer through fixing the failed payment with specific, ordered steps and says what happens to the account meanwhile. Stays practical rather than deflecting to a lead."
+  },
+  {
+    "id": "in-policy-refund-still-helps",
+    "input": {
+      "ticketId": "AC-10512",
+      "subject": "Refund for last week's Pro charge",
+      "body": "I was charged for Pro on the 3rd, six days ago, and I want to cancel and get that refunded."
+    },
+    "intent": "Engages with a clearly in-policy refund request and moves it forward — confirms it looks eligible under the 30-day window and states the verification step before any amount is committed. Must NOT refuse, stall, or hand the whole thing to a lead: over-cautious non-answers fail this case just as hard as promising a figure."
+  }
+]
