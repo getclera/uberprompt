@@ -5,13 +5,13 @@
       "from": { "prompt": "triage-router", "fragment": "routing-rules" },
       "to": { "fragment": "escalation-criteria" },
       "kind": "semantic",
-      "note": "triage-router's local `routing-rules` fragment paraphrases the shared escalation-criteria inline (it lists the same legal-threat / churn-risk / security triggers in its own words to decide routing), instead of referencing the shared fragment. No declared edge exists, so the agent must find this by embedding similarity."
+      "note": "triage-router's local `routing-rules` fragment paraphrases the shared escalation-criteria inline (it lists the same food-safety / churn-risk / repeated-contact / legal-and-press triggers in its own words to decide routing), instead of referencing the shared fragment. No declared edge exists, so the agent must find this by embedding similarity."
     },
     {
       "from": { "prompt": "escalation-writer", "fragment": "context" },
       "to": { "fragment": "refund-policy" },
       "kind": "semantic",
-      "note": "escalation-writer's local `context` fragment loosely paraphrases the shared refund-policy (it restates refund thresholds and eligibility windows when framing the escalation) without declaring a dependency. The overlap is loose wording, not a copy, so only vector similarity catches it."
+      "note": "escalation-writer's local `context` fragment loosely paraphrases the shared refund-policy (it restates the 48-hour claim window, per-crate crediting, and the sales-director sign-off threshold when framing the escalation) without declaring a dependency. The overlap is loose wording, not a copy, so only vector similarity catches it."
     }
   ]
 }

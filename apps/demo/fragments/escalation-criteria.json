@@ -1,5 +1,5 @@
 {
   "key": "escalation-criteria",
   "version": 1,
-  "text": "Escalate a ticket to a human specialist when ANY of these are true: (1) the customer makes a legal threat or mentions a lawyer, regulator, or lawsuit; (2) there is a security or data issue — breach, unauthorized access, data loss, or exposed credentials; (3) there is churn risk on an account worth more than $5,000 ARR; (4) the customer has made 3 or more contacts about the same issue without resolution. When in doubt on a high-value account, escalate rather than guess."
+  "text": "Escalate to the sales director when ANY of these are true: (1) a food-safety issue — mold, pests, contamination, or a cold-chain break; (2) churn risk on an account worth more than $50,000 per year; (3) the contact has made 3 or more contacts about the same issue without resolution; (4) a legal, press, or health-authority threat. When in doubt on a high-value account, escalate rather than guess."
 }
