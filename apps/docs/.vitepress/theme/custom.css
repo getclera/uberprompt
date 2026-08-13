@@ -93,9 +93,7 @@
 }
 
 .VPNavBarTitle .title {
-  font-family: var(--up-mono);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  display: none !important;
 }
 
 .VPHero .text {

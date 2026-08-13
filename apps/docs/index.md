@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: "<span class=\"u-pink\">ü</span>berPrompt"
+  name: "<span class=\"u-pink\">über</span>Prompt"
   text: Prompt dependency graph & semantic sync
   tagline: Trace, learn, apply, sync — one pipeline for production prompt management
   actions:
