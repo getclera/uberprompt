@@ -1,7 +1,8 @@
 # `uberprompt` CLI
 
-Dependency graph + semantic-sync for prompt fragments. Zero-build plain Node ESM;
-the only dependency is `@anthropic-ai/sdk` (needed by `infer`).
+Dependency graph + semantic-sync for prompt fragments, plus the stage-2 learn
+loop. Zero-build plain Node ESM; dependencies are `@anthropic-ai/sdk` (`infer`),
+`mongodb` and `openai` (`learn`).
 
 ## Install
 
@@ -42,6 +43,22 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
   existing edge and never touching declared `uses` edges. Needs
   `ANTHROPIC_API_KEY` (env or a repo-root `.env`); exits 1 with a clear message
   if unset.
+- **`learn [--limit 50] [--model gpt-5.1] [--dry-run]`** — stage 2 of the
+  pipeline (the demo's "hit analyze" button; on-demand, no daemon). Loads the
+  most recent unanalyzed `traces` with a prompt binding
+  (`{ promptName: { $exists: true } }`, minus traces already referenced by a
+  lesson's `sourceTraceIds`), asks the model for recurring failure patterns
+  (error field, score < 0.5, negative user replies in outputs), then per
+  candidate lesson: embeds the text via Voyage (`voyage-3.5-lite`, 1024 dims),
+  dedupes with `$vectorSearch` against the `lessons_embedding` index (skip when
+  similarity > 0.92 vs an active lesson), and inserts into `lessons` per the
+  IDEA.md contract. Prints a summary: traces analyzed / lessons written /
+  deduped. `--dry-run` prints candidates without embedding or writing. Needs
+  `MONGODB_URI` and `OPENAI_API_KEY` (+ `VOYAGE_API_KEY` unless `--dry-run`)
+  from env or the repo-root `.env`; exits 1 naming any missing var.
+  Embeddings default to `https://ai.mongodb.com/v1/embeddings` (Atlas-issued
+  Voyage keys only work there, not on `api.voyageai.com`); set `VOYAGE_API_URL`
+  to override for a direct Voyage key.
 
 ## Example — the raise-escalation-threshold scenario
 

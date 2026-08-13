@@ -22,9 +22,9 @@ function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--apply" || a === "--staged" || a === "--json") {
+    if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--limit" || a === "--model") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -36,6 +36,7 @@ function parseArgs(argv) {
     }
   }
   if (opts.threshold != null) opts.threshold = Number(opts.threshold);
+  if (opts.limit != null) opts.limit = Number(opts.limit);
   return opts;
 }
 
@@ -67,6 +68,11 @@ Commands:
   infer                 Ask the model for undeclared semantic edges.
                           --threshold <n>  confidence cutoff (default 0.7)
                           --apply          merge results into edges.json
+  learn                 Stage 2: analyze recent trace batches from Mongo and
+                        write embedded, vector-deduped lessons.
+                          --limit <n>    max traces to analyze (default 50)
+                          --model <id>   OpenAI model (default gpt-5.1)
+                          --dry-run      print candidate lessons, write nothing
   help                  Show this message.
 
 Global:
@@ -93,6 +99,10 @@ async function main() {
       return runAffected(dir, root, opts);
     case "infer":
       return await runInfer(dir, root, opts);
+    case "learn": {
+      const { runLearn } = await import("../src/learn.mjs");
+      return await runLearn(root, opts);
+    }
     case "help":
     case undefined:
       console.log(HELP);
