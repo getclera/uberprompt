@@ -30,29 +30,36 @@ function loadApiKey(repoRoot) {
   return null;
 }
 
-const TOOL = {
-  name: "report_semantic_edges",
-  description:
-    "Report semantic-dependency edges between prompt fragments. A semantic edge means two fragments restate, paraphrase, or constrain the SAME underlying rule (e.g. the same threshold, policy, or trigger) in their own words, such that editing one should trigger a review of the other.",
-  input_schema: {
+const TOOL_DESCRIPTION =
+  "Report semantic-dependency edges between prompt fragments. A semantic edge means two fragments restate, paraphrase, or constrain the SAME underlying rule (e.g. the same threshold, policy, or trigger) in their own words, such that editing one should trigger a review of the other.";
+
+function buildEdgeSchema(model, frags) {
+  const sharedKeys = [...model.fragments.keys()];
+  const promptNames = [...model.prompts.keys()];
+  const fragmentKeys = [...new Set(frags.map((f) => f.key))];
+  return {
     type: "object",
+    additionalProperties: false,
     properties: {
       edges: {
         type: "array",
         items: {
           type: "object",
+          additionalProperties: false,
           properties: {
             from: {
               type: "object",
+              additionalProperties: false,
               properties: {
-                prompt: { type: "string" },
-                fragment: { type: "string" },
+                prompt: { type: ["string", "null"], enum: [...promptNames, null] },
+                fragment: { type: "string", enum: fragmentKeys },
               },
-              required: ["fragment"],
+              required: ["prompt", "fragment"],
             },
             to: {
               type: "object",
-              properties: { fragment: { type: "string" } },
+              additionalProperties: false,
+              properties: { fragment: { type: "string", enum: sharedKeys } },
               required: ["fragment"],
             },
             confidence: { type: "number" },
@@ -63,8 +70,8 @@ const TOOL = {
       },
     },
     required: ["edges"],
-  },
-};
+  };
+}
 
 // Pairs already tied by a declared "uses" edge from that prompt — never re-infer.
 function usesPairKeys(model) {
@@ -125,36 +132,30 @@ export async function runInfer(dir, repoRoot, opts) {
     "Fragments:\n" +
     listing;
 
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ apiKey });
+  const { generateText, Output, jsonSchema } = await import("ai");
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  const provider = createOpenAI({ apiKey });
 
-  const resp = await client.chat.completions.create({
-    model: MODEL,
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: TOOL.name,
-          description: TOOL.description,
-          parameters: TOOL.input_schema,
-        },
-      },
-    ],
-    tool_choice: { type: "function", function: { name: TOOL.name } },
-    messages: [{ role: "user", content: prompt }],
+  const { output } = await generateText({
+    model: provider(MODEL),
+    output: Output.object({ schema: jsonSchema(buildEdgeSchema(model, frags)) }),
+    prompt: `${TOOL_DESCRIPTION}\n\n${prompt}`,
+    telemetry: { functionId: "cli-infer" },
   });
 
-  const toolCall = (resp.choices[0]?.message?.tool_calls || []).find(
-    (c) => c.function?.name === TOOL.name
-  );
-  const raw = toolCall
-    ? JSON.parse(toolCall.function.arguments).edges || []
-    : [];
+  const raw = output?.edges || [];
 
   const usesPairs = usesPairKeys(model);
   const proposed = [];
   for (const e of raw) {
     if (!e.from || !e.to || !e.to.fragment) continue;
+    if (e.from.prompt === null) delete e.from.prompt;
+    if (e.from.prompt) {
+      const owner = model.prompts.get(e.from.prompt);
+      if (!owner || !(owner.fragments || []).some((f) => f.key === e.from.fragment)) continue;
+    } else if (!model.fragments.has(e.from.fragment)) {
+      continue;
+    }
     if (e.from.fragment && e.from.fragment.includes(".")) {
       const dot = e.from.fragment.indexOf(".");
       const head = e.from.fragment.slice(0, dot);

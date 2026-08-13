@@ -1,7 +1,7 @@
 # `uberprompt` CLI
 
 Dependency graph + semantic-sync for prompt fragments. Zero-build plain Node ESM;
-the only dependency is `openai` (needed by `infer`).
+LLM calls go through the Vercel AI SDK (`ai` + `@ai-sdk/openai`, needed by `infer`).
 
 ## Install
 
