@@ -98,6 +98,76 @@ export const PROPOSALS_VALIDATOR: Document = {
   },
 };
 
+export const SPANS_VALIDATOR: Document = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: ["traceId", "spanId", "name", "kind", "service", "startTime", "endTime", "durationMs", "status", "attributes", "resource", "ingestedAt"],
+    properties: {
+      traceId: { bsonType: "string" },
+      spanId: { bsonType: "string" },
+      parentSpanId: { bsonType: "string" },
+      name: { bsonType: "string" },
+      kind: { bsonType: "string" },
+      service: { bsonType: "string" },
+      startTime: { bsonType: "date" },
+      endTime: { bsonType: "date" },
+      durationMs: { bsonType: ["int", "long", "double"], minimum: 0 },
+      status: { enum: ["ok", "error"] },
+      statusMessage: { bsonType: "string" },
+      attributes: { bsonType: "object" },
+      resource: { bsonType: "object" },
+      ingestedAt: { bsonType: "date" },
+    },
+  },
+};
+
+export const TRACES_VALIDATOR: Document = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: ["traceId", "service", "operation", "output", "meta", "spanCount", "ts"],
+    properties: {
+      traceId: { bsonType: "string" },
+      service: { bsonType: "string" },
+      operation: { bsonType: "string" },
+      promptName: { bsonType: "string" },
+      promptVersion: { bsonType: ["int", "long", "double"] },
+      promptVersionId: { bsonType: "objectId" },
+      contentHash: { bsonType: "string" },
+      output: { bsonType: "string" },
+      meta: {
+        bsonType: "object",
+        required: ["model", "latencyMs"],
+        properties: {
+          provider: { bsonType: "string" },
+          model: { bsonType: "string" },
+          latencyMs: { bsonType: ["int", "long", "double"], minimum: 0 },
+        },
+      },
+      spanCount: { bsonType: ["int", "long", "double"], minimum: 1 },
+      score: { bsonType: ["int", "long", "double"] },
+      error: { bsonType: "string" },
+      ts: { bsonType: "date" },
+    },
+  },
+};
+
+export const LESSONS_VALIDATOR: Document = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: ["text", "embedding", "sourceTraceIds", "appliesTo", "status", "ts"],
+    properties: {
+      text: { bsonType: "string" },
+      reason: { bsonType: "string" },
+      embedding: { bsonType: "array" },
+      sourceTraceIds: { bsonType: "array" },
+      appliesTo: { bsonType: "array" },
+      status: { enum: ["active", "superseded"] },
+      processedAt: { bsonType: "date" },
+      ts: { bsonType: "date" },
+    },
+  },
+};
+
 async function createSearchIndex(collection: string, index: Document): Promise<void> {
   try {
     await getDb().command({ createSearchIndexes: collection, indexes: [index] });
@@ -163,6 +233,9 @@ async function main(): Promise<void> {
 
   await applyValidator(COLLECTIONS.evalRuns, EVAL_RUNS_VALIDATOR);
   await applyValidator(COLLECTIONS.proposals, PROPOSALS_VALIDATOR);
+  await applyValidator(COLLECTIONS.spans, SPANS_VALIDATOR);
+  await applyValidator(COLLECTIONS.traces, TRACES_VALIDATOR);
+  await applyValidator(COLLECTIONS.lessons, LESSONS_VALIDATOR);
 
   await closeDb();
 }
