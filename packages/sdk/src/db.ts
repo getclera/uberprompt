@@ -7,6 +7,7 @@ import {
   type PromptDoc,
   type PromptVersionDoc,
   type ProposalDoc,
+  type SpanDoc,
   type TraceDoc,
 } from "./types";
 
@@ -35,6 +36,10 @@ export function promptVersionsCol(): Collection<PromptVersionDoc> {
 
 export function edgesCol(): Collection<EdgeDoc> {
   return getDb().collection<EdgeDoc>(COLLECTIONS.edges);
+}
+
+export function spansCol(): Collection<SpanDoc> {
+  return getDb().collection<SpanDoc>(COLLECTIONS.spans);
 }
 
 export function tracesCol(): Collection<TraceDoc> {

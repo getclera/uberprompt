@@ -28,9 +28,13 @@ branches listed in IDEA.md instead of rewriting.
 
 ## The four main tasks
 - [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
-  - Contract in IDEA.md. Next: `packages/tracing` (normalize, rollup, exporter, register),
-    then `init` / `collect` / `tail` added as subcommands to the existing `packages/cli`,
-    then the demo app emitting real traces.
+  - [x] `packages/tracing`: normalize, rollup ($merge), MongoSpanExporter, registerUberprompt,
+    OTLP wire decode, index bootstrap. Verified against the live cluster both ways —
+    `pnpm --filter @uberprompt/tracing smoke` (AI SDK 7 in-process, multi-step + tool call)
+    and `smoke:otlp` (raw OTLP payload, 7/7 assertions).
+  - [ ] `init` / `collect` / `tail` subcommands on the existing `packages/cli`.
+  - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
+  - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
 - [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
 - [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals

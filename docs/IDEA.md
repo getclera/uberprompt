@@ -110,6 +110,7 @@ Database `uberprompt`, collections:
     usage?: { inputTokens?, outputTokens?, totalTokens?,
               cacheReadInputTokens?, cacheCreationInputTokens? } },
   prompt?: { name, version, versionId: ObjectId, contentHash },
+  input?: unknown, output?: string,  // promoted at normalize time, see note below
   attributes: object,        // raw OTel attrs, dotted keys verbatim
   resource: object, ingestedAt: Date }
 
@@ -180,6 +181,22 @@ Why the rollup is computed in Mongo rather than in the exporter: usage and model
 child spans, the root span ends last, and export batches arrive in arbitrary order.
 Recomputing from `spans` with `$merge` is idempotent and order-independent, and the CLI
 collector reuses it unchanged.
+
+**Gotchas found while building this, all verified against `ai@7.0.65` / `@ai-sdk/otel@1.0.65`:**
+
+- Span names follow **GenAI SemConv**, not the old AI SDK names: `invoke_agent`, `chat`,
+  `step N`, `execute_tool <name>`. Nothing is called `ai.generateText.doGenerate` anymore.
+- **Token usage is double-counted if you naively sum spans.** The root `invoke_agent` span
+  carries the whole call's aggregate *and* each child `chat` span carries its own. The
+  rollup therefore prefers the root's usage and only falls back to summing children.
+- `input`/`output` are promoted onto `SpanDoc` at normalize time rather than read from
+  `attributes` in the pipeline, because attribute keys contain literal dots
+  (`gen_ai.input.messages`) which Mongo would read as a nested path. Dotted keys also
+  cannot be expanded into nested objects, since `ai.prompt` is a string while
+  `ai.prompt.messages` also exists — they would collide.
+- In AI SDK 7 both `finishReason` and `usage` are **objects**, not scalars:
+  `{ unified, raw }` and `{ inputTokens: { total, noCache, cacheRead, cacheWrite }, … }`.
+  Returning the old flat shapes from a mock silently yields empty usage.
 
 Package layout for this (extends the Stack section in CLAUDE.md):
 
