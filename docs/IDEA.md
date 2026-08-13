@@ -37,8 +37,9 @@ every mutation is versioned (bump + snapshot + re-embed changed fragments).
 2. **Catalog reasoning**: LLM reads the full prompt catalog (name, purpose
    description, template, fragment keys) and picks other prompts the lesson
    applies to. Full recall at our scale (<50 prompts); no embedding blind spot.
-3. **RAG** (only if the catalog ever outgrows context): vector search over
-   embedded *purpose descriptions*, not literal prompt text. Skip for hackathon.
+3. **RAG**: vector search of the lesson embedding over embedded *purpose
+   descriptions* (`descriptions_embedding`), not literal prompt text — decided
+   IN scope, it's cheap.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
@@ -76,6 +77,8 @@ Database `uberprompt`, collections:
 ```ts
 // prompts — current version per name; history in prompt_versions
 { _id, name: string, version: number,
+  description: string,         // one-line purpose, auto-generated at definePrompt
+  descriptionEmbedding?: number[],
   fragments: [{ key: string, text: string, embedding?: number[] }],
   template: string,            // "{{intro}}\n{{tone}}\n{{task}}" refs fragment keys
   updatedAt: Date, updatedBy: string }
@@ -95,9 +98,9 @@ Database `uberprompt`, collections:
   score?: number, error?: string, ts: Date }
 
 // lessons — the agent's persistent memory
-{ _id, text: string, embedding: number[],
+{ _id, text: string, reason?: string, embedding: number[],
   sourceTraceIds: ObjectId[], appliesTo: string[],
-  status: "active" | "superseded", ts: Date }
+  status: "active" | "superseded", processedAt?: Date, ts: Date }
 
 // proposals — pending changes awaiting approval
 { _id, target: { prompt: string, fragment?: string },
@@ -106,8 +109,22 @@ Database `uberprompt`, collections:
   status: "pending" | "applied" | "rejected", ts: Date }
 ```
 
-Vector Search indexes: `fragments_embedding` on `prompts.fragments.embedding`,
-`lessons_embedding` on `lessons.embedding` (Voyage, cosine).
+Vector Search indexes (Voyage, cosine): `fragments_embedding` on
+`prompts.fragments.embedding`, `lessons_embedding` on `lessons.embedding`,
+`descriptions_embedding` on `prompts.descriptionEmbedding`.
+
+### Interfaces between stages
+
+- Stage 2 → 3: the `lessons` collection IS the interface — stage 2 inserts,
+  stage 3 consumes new lessons and stamps `processedAt` after filing proposals.
+- Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
+  `descriptions_embedding` (function-level match, not literal text).
+- Dependency interface (fragment-level, used by stage 4):
+  `getDependents({prompt, fragment}, {semantic?, minScore?})` → affected targets
+  with kind "uses"|"semantic" (+score); semantic mode runs vector discovery and
+  persists new semantic edges. Inverse helper: `getDependencies(target)`.
+  Diff helper: `diffVersions(promptName, vNew)` → changed fragments old/new text
+  (computed from prompt_versions).
 
 ## Prompt files (demo source format)
 
