@@ -10,15 +10,21 @@ importers:
 
   apps/agent:
     dependencies:
+      '@ai-sdk/openai':
+        specifier: ^4.0.41
+        version: 4.0.41(zod@4.4.3)
       '@uberprompt/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@uberprompt/tracing':
+        specifier: workspace:*
+        version: link:../../packages/tracing
+      ai:
+        specifier: ^7.0.65
+        version: 7.0.65(zod@4.4.3)
       mongodb:
         specifier: ^6.18.0
         version: 6.21.0
-      openai:
-        specifier: ^6.10.0
-        version: 6.49.0(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -423,26 +429,6 @@ packages:
       socks:
         optional: true
 
-  openai@6.49.0:
-    resolution: {integrity: sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==}
-    peerDependencies:
-      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
-      '@smithy/hash-node': '>=4.3.0 <5'
-      '@smithy/signature-v4': '>=5.4.0 <6'
-      ws: ^8.18.0
-      zod: ^3.25 || ^4.0
-    peerDependenciesMeta:
-      '@aws-sdk/credential-provider-node':
-        optional: true
-      '@smithy/hash-node':
-        optional: true
-      '@smithy/signature-v4':
-        optional: true
-      ws:
-        optional: true
-      zod:
-        optional: true
-
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
@@ -748,10 +734,6 @@ snapshots:
       '@mongodb-js/saslprep': 1.4.13
       bson: 6.10.4
       mongodb-connection-string-url: 3.0.2
-
-  openai@6.49.0(zod@4.4.3):
-    optionalDependencies:
-      zod: 4.4.3
 
   punycode@2.3.1: {}
 
