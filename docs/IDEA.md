@@ -26,7 +26,7 @@ An agent consumes trace batches and mines what's going wrong / recurring. Output
 **lessons** — durable, embedded memory entries, vector-deduped against existing
 lessons. Lessons are knowledge, not yet action.
 
-### 3. Apply to prompts (owner: shlok — was talwe, see TASKS.md)
+### 3. Apply to prompts (owner: shlok)
 Lessons (or a human edit in the dashboard) become concrete changes:
 proposal → approval → new prompt version. The only stage that mutates prompts;
 every mutation is versioned (bump + snapshot + re-embed changed fragments).
@@ -100,19 +100,49 @@ Database `uberprompt`, collections:
   template: string,            // "{{intro}}\n{{tone}}\n{{task}}" refs fragment keys
   updatedAt: Date, updatedBy: string }
 
-// prompt_versions — immutable snapshots (same shape + { promptName, frozenAt })
+// prompt_versions — immutable, append-only snapshots
+// (same shape + { promptName, frozenAt, contentHash })
+// contentHash = sha256 of { template, fragments:[{key,text}] } — version identity is
+// deterministic, so re-running definePrompt with unchanged text never bumps a version.
 
-// edges — dependency graph
-{ _id, from: { prompt: string, fragment?: string },
-  to:   { prompt: string, fragment?: string },
+// edges — dependency graph; fragment-only endpoint = shared fragment
+// (matches apps/demo/edges.json + expected-semantic-edges.json)
+{ _id, from: { prompt?: string, fragment?: string },
+  to:   { prompt?: string, fragment?: string },
   kind: "uses" | "semantic",   // "uses" = declared in SDK; "semantic" = agent-found
-  note?: string }
+  note?: string,
+  // semantic edges only — inference provenance:
+  confidence?: number, model?: string, inferredAt?: Date }
 
-// traces
-{ _id, promptName: string, promptVersion: number,
-  input: object, output: string,
-  meta: { model: string, latencyMs: number, tokens?: object },
-  score?: number, error?: string, ts: Date }
+// spans — raw OTel spans, one per LLM call / tool execution / step.
+// Written by the OTel SpanExporter (in-process SDK) or the OTLP collector (CLI).
+{ _id, traceId: string, spanId: string, parentSpanId?: string,
+  name: string,              // "ai.generateText", "ai.generateText.doGenerate", ...
+  kind: string, service: string,
+  startTime: Date, endTime: Date, durationMs: number,
+  status: "ok" | "error", statusMessage?: string,
+  genAi?: {                  // hot fields promoted out of GenAI SemConv attributes
+    operation?, provider?, requestModel?, responseModel?, responseId?,
+    finishReasons?: string[], toolName?, toolCallId?,
+    usage?: { inputTokens?, outputTokens?, totalTokens?,
+              cacheReadInputTokens?, cacheCreationInputTokens? } },
+  prompt?: { name, version, versionId: ObjectId, contentHash },
+  input?: unknown, output?: string,  // promoted at normalize time, see note below
+  attributes: object,        // raw OTel attrs, dotted keys verbatim
+  resource: object, ingestedAt: Date }
+
+// traces — rollup, one per root operation span. Derived from `spans` by an
+// aggregation with $merge, so it is idempotent and batch-order independent.
+// Every field the earlier flat trace doc had survives, so stage 2 is unaffected —
+// except promptName/promptVersion, now optional (an OTLP source may carry no
+// prompt binding). Filter on { promptName: { $exists: true } }.
+{ _id, traceId: string, service: string, operation: string,
+  promptName?: string, promptVersion?: number,
+  promptVersionId?: ObjectId,  // FK -> prompt_versions._id
+  contentHash?: string,
+  input: unknown, output: string,
+  meta: { provider?: string, model: string, latencyMs: number, tokens?: object },
+  spanCount: number, score?: number, error?: string, ts: Date }
 
 // lessons — the agent's persistent memory
 { _id, text: string, reason?: string, embedding: number[],
@@ -151,6 +181,75 @@ Vector Search indexes (Voyage, cosine): `fragments_embedding` on
 `prompts.fragments.embedding`, `lessons_embedding` on `lessons.embedding`,
 `descriptions_embedding` on `prompts.descriptionEmbedding`.
 
+### Prompt-version references ("foreign keys")
+
+Mongo enforces no referential integrity — no FK constraints, no cascade, and
+`$jsonSchema` validators check shape only, never existence. We get the same guarantee
+by construction instead:
+
+- `traces.promptVersionId` / `spans.prompt.versionId` reference `prompt_versions._id`;
+  join with `$lookup` (and `$graphLookup` for the stage-4 graph walk).
+- `prompt_versions` is immutable and append-only, and the version doc is resolved
+  **before** any span can reference it — so a reference can never dangle.
+  (Open: whether stage 1 may create a missing version doc or must error and leave all
+  writes to stage 3. Decide before `packages/tracing` lands.)
+- `promptName` + `promptVersion` + `contentHash` are denormalized onto traces/spans, so
+  "group traces by prompt version" (stage 2) needs no join at all.
+- Indexes: `prompt_versions {promptName:1, version:1}` unique, `{contentHash:1}`;
+  `traces {traceId:1}` unique (the `$merge` key), `{promptName:1, ts:-1}`,
+  `{promptVersionId:1, ts:-1}`; `spans {traceId:1, startTime:1}`, `{spanId:1}` unique.
+
+Live Atlas state as of this PR: `spans` does not exist yet, and `traces` has no unique
+index on `traceId` — without it `$merge` appends duplicate rollups instead of updating
+in place. Both are created by the stage 1 `init` subcommand.
+
+### Trace ingestion — one path, OTLP
+
+Capture is standard OpenTelemetry, so anything that speaks OTLP can feed the graph:
+
+- **SDK:** `registerUberprompt()` wires a `NodeTracerProvider` + `MongoSpanExporter` and
+  registers `@ai-sdk/otel`'s integration with AI SDK 7 (`ai@7`'s core has no OTel; the
+  integration is the separate `@ai-sdk/otel` package — verified against `ai@7.0.65`).
+  Prompt binding rides an `AsyncLocalStorage` via that integration's `enrichSpan` hook,
+  stamping `uberprompt.prompt.*` attributes onto every span of the call.
+- **CLI:** `uberprompt collect` runs an OTLP/HTTP receiver on :4318 and writes through the
+  exact same normalize + rollup core — any language, no SDK import.
+
+Why the rollup is computed in Mongo rather than in the exporter: usage and model live on
+child spans, the root span ends last, and export batches arrive in arbitrary order.
+Recomputing from `spans` with `$merge` is idempotent and order-independent, and the CLI
+collector reuses it unchanged.
+
+**Gotchas found while building this, all verified against `ai@7.0.65` / `@ai-sdk/otel@1.0.65`:**
+
+- Span names follow **GenAI SemConv**, not the old AI SDK names: `invoke_agent`, `chat`,
+  `step N`, `execute_tool <name>`. Nothing is called `ai.generateText.doGenerate` anymore.
+- **Token usage is double-counted if you naively sum spans.** The root `invoke_agent` span
+  carries the whole call's aggregate *and* each child `chat` span carries its own. The
+  rollup therefore prefers the root's usage and only falls back to summing children.
+- `input`/`output` are promoted onto `SpanDoc` at normalize time rather than read from
+  `attributes` in the pipeline, because attribute keys contain literal dots
+  (`gen_ai.input.messages`) which Mongo would read as a nested path. Dotted keys also
+  cannot be expanded into nested objects, since `ai.prompt` is a string while
+  `ai.prompt.messages` also exists — they would collide.
+- In AI SDK 7 both `finishReason` and `usage` are **objects**, not scalars:
+  `{ unified, raw }` and `{ inputTokens: { total, noCache, cacheRead, cacheWrite }, … }`.
+  Returning the old flat shapes from a mock silently yields empty usage.
+
+Package layout for this (extends the Stack section in CLAUDE.md):
+
+```
+packages/sdk       shared core — every workstream imports it (types, db, prompt, embeddings)
+packages/tracing   ingestion core — normalize, rollup, exporter, register, OTLP decode
+packages/cli       existing CLI (felix: infer / affected / graph) — stage 1 adds
+                   init / collect / tail as subcommands, logic stays in packages/tracing
+```
+
+`tracing` depends on `sdk`; `cli` depends on `tracing`; nothing depends on `cli`. Keeping
+ingestion out of `packages/sdk` is deliberate — it keeps stage 1 off the file stage 3 edits.
+Note that `packages/cli` is currently plain `.mjs` while the stack is otherwise TypeScript;
+stage 1's subcommands stay thin so the language boundary sits at the CLI edge only.
+
 ### Interfaces between stages
 
 - Stage 2 → 3: the `lessons` collection IS the interface — stage 2 inserts,
@@ -174,7 +273,9 @@ Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
   canonical (brand-voice, refund-policy, escalation-criteria, output-format).
 - `apps/demo/prompts/<name>.json` — `{ name, version, template,
   fragments: [local {key,text}], uses: [shared keys] }`.
-- `apps/demo/edges.json` — declared `uses` edges.
+- `apps/demo/edges.json` — the dependency graph, one central file (mirrors the
+  `edges` collection; edges are pair-owned, so no per-prompt storage). Declared
+  `uses` edges plus inferred `semantic` edges written by `uberprompt infer`.
 - `apps/demo/expected-semantic-edges.json` — ground truth the stage-4 inference
   must discover (e.g. triage-router routing-rules ↔ escalation-criteria;
   escalation-writer context ↔ refund-policy).
@@ -182,6 +283,12 @@ Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
 - `apps/demo/golden/<prompt-name>.json` — `[{ id, input, intent }]`; the eval gate's
   regression set for that prompt. Lives in-repo next to the prompt it protects, not
   in Mongo: a golden case and the fragment it guards change together.
+
+File-first tooling: `packages/cli` ships the **`uberprompt` CLI** — `infer`
+(`gpt-5-nano` infers semantic edges from fragment texts → edges.json), `affected`
+(git-diff changed prompt/fragment files → transitive graph walk → impacted
+prompts), `graph` (print the graph). The stage-4 agent and the CLI share the
+same edges.json semantics.
 
 Version = integer, bumped on every text change. The seed script inlines shared
 fragments into each prompt's `fragments` array to match the Mongo contract shape.

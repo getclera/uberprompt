@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+// uberprompt — dependency graph + semantic-sync CLI for prompt fragments.
+import { execFileSync } from "node:child_process";
+import { resolve, isAbsolute, join } from "node:path";
+import { runGraph } from "../src/graph-cmd.mjs";
+import { runAffected } from "../src/affected.mjs";
+import { runInfer } from "../src/infer.mjs";
+import { runTracing } from "../src/tracing-cmd.mjs";
+
+function repoRoot() {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return process.cwd();
+  }
+}
+
+// Hand-rolled arg parsing. Extracts --dir, boolean flags, and --key value pairs.
+function parseArgs(argv) {
+  const opts = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--apply" || a === "--staged" || a === "--json") {
+      opts[a.slice(2)] = true;
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service") {
+      opts[a.slice(2)] = argv[++i];
+    } else if (a.startsWith("--")) {
+      // --key=value form
+      const eq = a.indexOf("=");
+      if (eq !== -1) opts[a.slice(2, eq)] = a.slice(eq + 1);
+      else opts[a.slice(2)] = true;
+    } else {
+      opts._.push(a);
+    }
+  }
+  if (opts.threshold != null) opts.threshold = Number(opts.threshold);
+  return opts;
+}
+
+function resolveDir(root, dirOpt) {
+  if (!dirOpt) return join(root, "apps", "demo");
+  return isAbsolute(dirOpt) ? dirOpt : resolve(process.cwd(), dirOpt);
+}
+
+const HELP = `uberprompt — prompt-fragment dependency graph + semantic sync
+
+Usage:
+  uberprompt <command> [--dir <demo-dir>] [options]
+
+Commands:
+  graph [node]          Render the dependency graph. Without a node: 2D map —
+                        prompts left, shared fragments right, colored buses
+                        between (● = junction where a line crosses its own bus).
+                        With a node: the impact tree of that node.
+                          --tree   per-prompt dependency trees instead of the map
+                          --json --no-color
+  affected [<node>]     With <node> (a prompt, shared fragment, or
+                        prompt.fragment): show what depends on it and what it
+                        depends on, with backing files.
+                        Without <node>: show prompts affected by git-changed
+                        prompt/fragment files.
+                          --base <ref>   git mode: compare against ref (default HEAD)
+                          --staged       git mode: use staged changes
+                          --json
+  infer                 Ask the model for undeclared semantic edges.
+                          --threshold <n>  confidence cutoff (default 0.7)
+                          --apply          merge results into edges.json
+
+  init                  Create the trace-ingestion collections and indexes
+                        (spans, plus the unique traces.traceId index that the
+                        rollup's \$merge depends on).
+  collect               Run an OTLP/HTTP receiver; any language, no SDK import.
+                        Spans land in the spans collection and roll up into traces.
+                          --port <n>       listen port (default 4318)
+                          --service <name> fallback service.name
+  tail                  Print recent traces, then stream new ones live via a
+                        MongoDB change stream.
+
+  help                  Show this message.
+
+Global:
+  --dir <path>          Demo dir with prompts/, fragments/, edges.json
+                        (default: <repo-root>/apps/demo)
+`;
+
+async function main() {
+  const argv = process.argv.slice(2);
+  const opts = parseArgs(argv);
+  const cmd = opts._[0];
+  const root = repoRoot();
+  const dir = resolveDir(root, opts.dir);
+
+  switch (cmd) {
+    case "graph":
+      return runGraph(dir, opts);
+    case "affected":
+      if (opts._[1]) {
+        const { runNodeAffected } = await import("../src/node-affected.mjs");
+        const { loadModel } = await import("../src/load.mjs");
+        return runNodeAffected(loadModel(dir), root, opts._[1], opts);
+      }
+      return runAffected(dir, root, opts);
+    case "infer":
+      return await runInfer(dir, root, opts);
+    case "init":
+    case "collect":
+    case "tail":
+      return await runTracing(cmd, root, opts);
+    case "help":
+    case undefined:
+      console.log(HELP);
+      return 0;
+    default:
+      console.error(`unknown command: ${cmd}\n`);
+      console.log(HELP);
+      return 1;
+  }
+}
+
+main().then((code) => process.exit(code || 0));

@@ -32,6 +32,24 @@ If not, push the doc fix (doc-only fixes may go straight to main).
 
 ## Git workflow — merge early, merge often
 
+### Worktrees — ALL code changes go in a worktree, never the primary repo
+
+- The primary checkout stays on `main` and is never modified. Even "quick"
+  one-file fixes go through a worktree. No size/urgency exception — "it's one
+  line", "main already has uncommitted changes here", "a worktree feels like
+  overhead" are all invalid justifications.
+- **The only exception is an explicit, unambiguous instruction to edit the
+  primary repo** (the user naming `main`/the primary checkout and saying to
+  change it there). A terse or ambiguous prompt is not permission — ask instead
+  of guessing.
+- Create worktrees with the `EnterWorktree` tool, then rename the auto branch
+  to `<name>/<task>` (`git branch -m`).
+- Never run git commands in the primary repo while working in a worktree.
+- **Never `git stash`** — worktrees share one stash stack; a stash pushed in
+  one surfaces in the others. Commit to a scratch branch or export a patch
+  (`git diff > patch`) instead.
+- Doc-only fixes to `docs/` may still go straight to main (see below).
+
 - Work on short-lived branches (`<name>/<task>`), one task per branch.
 - Open a PR as soon as there's anything reviewable and **merge fast** — a PR should
   live minutes, not hours. Small diffs, atomic commits (stage specific files, never
@@ -40,7 +58,11 @@ If not, push the doc fix (doc-only fixes may go straight to main).
   merge you see land. Resolve conflicts immediately yourself — never leave a
   conflicted branch sitting; if a conflict touches the IDEA.md contract, the
   IDEA.md version wins.
-- Never force-push shared branches. Doc-only fixes may go straight to main.
+- **NEVER force-push `main` — no exceptions, it overwrites teammates' code.**
+  `--force-with-lease` is allowed only on your own feature branch (e.g. after a
+  rebase), never on main, never on a branch someone else may be using.
+- **NEVER push directly to `main` — everything goes through a PR**, docs included.
+  Rebase your branch on origin/main, push the branch, open the PR, merge fast.
 - Secrets live in `.env` (gitignored). Never commit or print credential values.
 
 ## Keep the main session free — delegate everything heavy
@@ -52,7 +74,13 @@ talks to you. It should never be blocked grinding on a long task.
   tool / background tasks) or **Codex** agents. Run independent subtasks in
   parallel, in one message.
 - Anything expected to take more than ~2 minutes of tool-grinding → delegate it and
-  keep the main session responsive for the next instruction.
+  keep the main session responsive for the next instruction. This includes infra
+  chores (DB setup, env wiring, installs) — NOT just feature code.
+- Ready-made subagents live in `.claude/agents/`: **builder** (code → PR),
+  **ops** (infra/DB/env chores), **reviewer** (PR review vs contract). Use them.
+- The main session's job between delegations: answer the human, review results,
+  merge, update docs. If the main session is running a shell loop, it's doing it
+  wrong.
 - Subagents work in their own worktrees/branches; the main session reviews and
   merges their output.
 
@@ -61,8 +89,23 @@ talks to you. It should never be blocked grinding on a long task.
 TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashboard),
 `apps/agent` (sync agent), `apps/demo` (demo app that generates traces).
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
-Embeddings: Voyage AI. LLM: Claude API (`@anthropic-ai/sdk`), model `claude-opus-5`,
-adaptive thinking (default — don't pass a `thinking` config or sampling params).
+Embeddings: Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite, 1024d).
+LLM: **OpenAI** (`openai` npm pkg, `OPENAI_API_KEY` in .env) — there is NO Anthropic
+key; don't write `@anthropic-ai/sdk` call paths. CLI `infer` uses `gpt-5-nano`.
+Default model **`gpt-5.1`**; cheap variant for bulk/low-stakes calls is
+**`gpt-5.4-mini`** (`gpt-5.1-mini` does NOT exist on this key — 404s, verified).
+
+## Environment gotchas (verified the hard way — don't rediscover)
+
+- **VOYAGE_API_KEY is Atlas-issued**: it 403s on `api.voyageai.com`. Use
+  `https://ai.mongodb.com/v1/embeddings` (same request shape, 1024d verified).
+  `packages/sdk/src/embeddings.ts` now points there (fixed); override with
+  `VOYAGE_EMBEDDINGS_URL` if the host ever moves.
+- Fresh `pnpm install` fails on `ai@7.0.65` (younger than pnpm's 24h
+  supply-chain default): use `pnpm install --config.minimum-release-age=0`.
+- Atlas + VPN don't mix (TLS handshake dies, looks like bad password) — see
+  TASKS.md setup notes. Password's `!` must be `%21` in the URI.
+Backend first — dashboard is parked.
 
 ## Code standards (ported from clera-platform, hackathon-weight)
 
@@ -78,3 +121,14 @@ adaptive thinking (default — don't pass a `thinking` config or sampling params
 - **No silent PASS.** Before claiming something works, show the command you ran and
   its real output (typecheck, script run, curl). "It should work" doesn't count.
 - Rebase `origin/main` before every push.
+
+## Debugging discipline (ported from clera-platform)
+
+- **Evidence before root cause.** A hypothesis needs DB/code/log proof before
+  being voiced — never assume data differences or timing explain a bug.
+- **Never blame cache.** "Stale cache" is not a root cause; trace the code path.
+- **Never blame deployment.** 95% of the time it's a code bug — deployment-state
+  theories require direct evidence before being voiced.
+- **Format only files you edited** — never run a repo-wide formatter. If a
+  formatter widens your diff beyond what you touched, `git checkout --` those
+  files before committing.
