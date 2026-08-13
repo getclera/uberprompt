@@ -33,8 +33,8 @@ async function readRepoJson<T>(relativePath: string): Promise<T> {
   return JSON.parse(await readFile(url, "utf8")) as T;
 }
 
-async function loadBillingDoc(): Promise<PromptDoc> {
-  const prompt = await readRepoJson<PromptFile>("prompts/billing-agent.json");
+async function loadRefundDoc(): Promise<PromptDoc> {
+  const prompt = await readRepoJson<PromptFile>("prompts/refund-agent.json");
   const shared = await Promise.all(
     prompt.uses.map((key) => readRepoJson<{ key: string; text: string }>(`fragments/${key}.json`)),
   );
@@ -77,9 +77,9 @@ test("withFragment throws on unknown key", () => {
 });
 
 test("fillInputs leaves no placeholders on a real seed trace", async () => {
-  const doc = await loadBillingDoc();
+  const doc = await loadRefundDoc();
   const traces = await readRepoJson<TraceSeed[]>("traces.seed.json");
-  const trace = traces.find((t) => t.promptName === "billing-agent");
+  const trace = traces.find((t) => t.promptName === "refund-agent");
   assert.ok(trace);
   const filled = fillInputs(renderPromptDoc(withOpenSlots(doc)), trace.input);
   assert.doesNotMatch(filled, /\{\{/);
