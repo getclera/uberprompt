@@ -83,7 +83,10 @@ Database `uberprompt`, collections:
   template: string,            // "{{intro}}\n{{tone}}\n{{task}}" refs fragment keys
   updatedAt: Date, updatedBy: string }
 
-// prompt_versions — immutable snapshots (same shape + { promptName, frozenAt })
+// prompt_versions — immutable, append-only snapshots
+// (same shape + { promptName, frozenAt, contentHash })
+// contentHash = sha256 of { template, fragments:[{key,text}] } — version identity is
+// deterministic, so re-running definePrompt with unchanged text never bumps a version.
 
 // edges — dependency graph; fragment-only endpoint = shared fragment
 // (matches apps/demo/edges.json + expected-semantic-edges.json)
@@ -94,11 +97,34 @@ Database `uberprompt`, collections:
   // semantic edges only — inference provenance:
   confidence?: number, model?: string, inferredAt?: Date }
 
-// traces
-{ _id, promptName: string, promptVersion: number,
-  input: object, output: string,
-  meta: { model: string, latencyMs: number, tokens?: object },
-  score?: number, error?: string, ts: Date }
+// spans — raw OTel spans, one per LLM call / tool execution / step.
+// Written by the OTel SpanExporter (in-process SDK) or the OTLP collector (CLI).
+{ _id, traceId: string, spanId: string, parentSpanId?: string,
+  name: string,              // "ai.generateText", "ai.generateText.doGenerate", ...
+  kind: string, service: string,
+  startTime: Date, endTime: Date, durationMs: number,
+  status: "ok" | "error", statusMessage?: string,
+  genAi?: {                  // hot fields promoted out of GenAI SemConv attributes
+    operation?, provider?, requestModel?, responseModel?, responseId?,
+    finishReasons?: string[], toolName?, toolCallId?,
+    usage?: { inputTokens?, outputTokens?, totalTokens?,
+              cacheReadInputTokens?, cacheCreationInputTokens? } },
+  prompt?: { name, version, versionId: ObjectId, contentHash },
+  attributes: object,        // raw OTel attrs, dotted keys verbatim
+  resource: object, ingestedAt: Date }
+
+// traces — rollup, one per root operation span. Derived from `spans` by an
+// aggregation with $merge, so it is idempotent and batch-order independent.
+// Every field the earlier flat trace doc had survives, so stage 2 is unaffected —
+// except promptName/promptVersion, now optional (an OTLP source may carry no
+// prompt binding). Filter on { promptName: { $exists: true } }.
+{ _id, traceId: string, service: string, operation: string,
+  promptName?: string, promptVersion?: number,
+  promptVersionId?: ObjectId,  // FK -> prompt_versions._id
+  contentHash?: string,
+  input: unknown, output: string,
+  meta: { provider?: string, model: string, latencyMs: number, tokens?: object },
+  spanCount: number, score?: number, error?: string, ts: Date }
 
 // lessons — the agent's persistent memory
 { _id, text: string, reason?: string, embedding: number[],
@@ -115,6 +141,59 @@ Database `uberprompt`, collections:
 Vector Search indexes (Voyage, cosine): `fragments_embedding` on
 `prompts.fragments.embedding`, `lessons_embedding` on `lessons.embedding`,
 `descriptions_embedding` on `prompts.descriptionEmbedding`.
+
+### Prompt-version references ("foreign keys")
+
+Mongo enforces no referential integrity — no FK constraints, no cascade, and
+`$jsonSchema` validators check shape only, never existence. We get the same guarantee
+by construction instead:
+
+- `traces.promptVersionId` / `spans.prompt.versionId` reference `prompt_versions._id`;
+  join with `$lookup` (and `$graphLookup` for the stage-4 graph walk).
+- `prompt_versions` is immutable and append-only, and the version doc is resolved
+  **before** any span can reference it — so a reference can never dangle.
+  (Open: whether stage 1 may create a missing version doc or must error and leave all
+  writes to stage 3. Decide before `packages/tracing` lands.)
+- `promptName` + `promptVersion` + `contentHash` are denormalized onto traces/spans, so
+  "group traces by prompt version" (stage 2) needs no join at all.
+- Indexes: `prompt_versions {promptName:1, version:1}` unique, `{contentHash:1}`;
+  `traces {traceId:1}` unique (the `$merge` key), `{promptName:1, ts:-1}`,
+  `{promptVersionId:1, ts:-1}`; `spans {traceId:1, startTime:1}`, `{spanId:1}` unique.
+
+Live Atlas state as of this PR: `spans` does not exist yet, and `traces` has no unique
+index on `traceId` — without it `$merge` appends duplicate rollups instead of updating
+in place. Both are created by the stage 1 `init` subcommand.
+
+### Trace ingestion — one path, OTLP
+
+Capture is standard OpenTelemetry, so anything that speaks OTLP can feed the graph:
+
+- **SDK:** `registerUberprompt()` wires a `NodeTracerProvider` + `MongoSpanExporter` and
+  registers `@ai-sdk/otel`'s integration with AI SDK 7 (`ai@7`'s core has no OTel; the
+  integration is the separate `@ai-sdk/otel` package — verified against `ai@7.0.65`).
+  Prompt binding rides an `AsyncLocalStorage` via that integration's `enrichSpan` hook,
+  stamping `uberprompt.prompt.*` attributes onto every span of the call.
+- **CLI:** `uberprompt collect` runs an OTLP/HTTP receiver on :4318 and writes through the
+  exact same normalize + rollup core — any language, no SDK import.
+
+Why the rollup is computed in Mongo rather than in the exporter: usage and model live on
+child spans, the root span ends last, and export batches arrive in arbitrary order.
+Recomputing from `spans` with `$merge` is idempotent and order-independent, and the CLI
+collector reuses it unchanged.
+
+Package layout for this (extends the Stack section in CLAUDE.md):
+
+```
+packages/sdk       shared core — every workstream imports it (types, db, prompt, embeddings)
+packages/tracing   ingestion core — normalize, rollup, exporter, register, OTLP decode
+packages/cli       existing CLI (felix: infer / affected / graph) — stage 1 adds
+                   init / collect / tail as subcommands, logic stays in packages/tracing
+```
+
+`tracing` depends on `sdk`; `cli` depends on `tracing`; nothing depends on `cli`. Keeping
+ingestion out of `packages/sdk` is deliberate — it keeps stage 1 off the file stage 3 edits.
+Note that `packages/cli` is currently plain `.mjs` while the stack is otherwise TypeScript;
+stage 1's subcommands stay thin so the language boundary sits at the CLI edge only.
 
 ### Interfaces between stages
 
