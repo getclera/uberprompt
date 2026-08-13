@@ -2,8 +2,8 @@
 // Apply (or revert) a demo scenario: performs the declarative edits in
 // scenarios/<name>/scenario.json against the prompt/fragment JSON files.
 //
-//   node apps/demo/scenarios/apply.mjs raise-escalation-threshold
-//   node apps/demo/scenarios/apply.mjs raise-escalation-threshold --revert
+//   node apps/demo/scenarios/apply.ts raise-escalation-threshold
+//   node apps/demo/scenarios/apply.ts raise-escalation-threshold --revert
 //
 // Apply replaces `find` → `replace` and bumps `version`; revert does the
 // opposite. Idempotent: refuses to apply twice / revert what isn't applied.
@@ -18,7 +18,7 @@ const repoRoot = resolve(scenariosDir, "../../..");
 const [name, flag] = process.argv.slice(2);
 const revert = flag === "--revert";
 if (!name) {
-  console.error("usage: apply.mjs <scenario-name> [--revert]");
+  console.error("usage: apply.ts <scenario-name> [--revert]");
   process.exit(1);
 }
 

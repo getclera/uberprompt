@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph } from "../src/graph.mjs";
+import { buildGraph } from "../src/graph.ts";
 import {
   modelFromMongo,
   diffFragments,
@@ -9,9 +9,10 @@ import {
   pickSemanticHits,
   edgeEndpoints,
   hasEdgeBetween,
-} from "../src/sync-check.mjs";
+} from "../src/sync-check.ts";
+import type { Edge, PromptDoc } from "../src/types.ts";
 
-const prompts = [
+const prompts: PromptDoc[] = [
   {
     name: "escalation-writer",
     version: 1,
@@ -33,7 +34,7 @@ const prompts = [
   },
 ];
 
-const edges = [
+const edges: Edge[] = [
   { from: { prompt: "escalation-writer" }, to: { fragment: "escalation-criteria" }, kind: "uses" },
   {
     from: { prompt: "triage-router", fragment: "routing-rules" },
@@ -46,7 +47,7 @@ const edges = [
 test("modelFromMongo feeds buildGraph the shape it expects", () => {
   const graph = buildGraph(modelFromMongo(prompts, edges));
   assert.ok(graph.promptNames.has("triage-router"));
-  assert.equal(graph.rev.get("escalation-criteria").length, 2);
+  assert.equal(graph.rev.get("escalation-criteria")!.length, 2);
 });
 
 test("diffFragments returns only changed non-empty fragments", () => {
@@ -69,7 +70,7 @@ test("diffFragments returns only changed non-empty fragments", () => {
 });
 
 test("dependentTargets expands prompt-level dependents and skips the changed prompt", () => {
-  const byName = new Map(prompts.map((p) => [p.name, p]));
+  const byName = new Map<string, PromptDoc>(prompts.map((p) => [p.name, p]));
   const graph = buildGraph(modelFromMongo(prompts, edges));
   const targets = dependentTargets(graph, byName, "escalation-writer", "escalation-criteria");
   const ids = targets.map((t) => `${t.prompt.name}.${t.fragment}`).sort();
@@ -77,7 +78,7 @@ test("dependentTargets expands prompt-level dependents and skips the changed pro
 });
 
 test("dependentTargets expands a dependent prompt into its non-empty fragments", () => {
-  const byName = new Map(prompts.map((p) => [p.name, p]));
+  const byName = new Map<string, PromptDoc>(prompts.map((p) => [p.name, p]));
   const graph = buildGraph(modelFromMongo(prompts, edges));
   const targets = dependentTargets(graph, byName, "tech-support-agent", "escalation-criteria");
   const ids = targets.map((t) => `${t.prompt.name}.${t.fragment}`).sort();

@@ -2,12 +2,13 @@
 // uberprompt — dependency graph + semantic-sync CLI for prompt fragments.
 import { execFileSync } from "node:child_process";
 import { resolve, isAbsolute, join } from "node:path";
-import { runGraph } from "../src/graph-cmd.mjs";
-import { runAffected } from "../src/affected.mjs";
-import { runInfer } from "../src/infer.mjs";
-import { runTracing } from "../src/tracing-cmd.mjs";
+import { runGraph } from "../src/graph-cmd.ts";
+import { runAffected } from "../src/affected.ts";
+import { runInfer } from "../src/infer.ts";
+import { runTracing } from "../src/tracing-cmd.ts";
+import type { CliOpts } from "../src/types.ts";
 
-function repoRoot() {
+function repoRoot(): string {
   try {
     return execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf8",
@@ -19,10 +20,10 @@ function repoRoot() {
 }
 
 // Hand-rolled arg parsing. Extracts --dir, boolean flags, and --key value pairs.
-function parseArgs(argv) {
-  const opts = { _: [] };
+function parseArgs(argv: string[]): CliOpts {
+  const opts: CliOpts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+    const a = argv[i]!;
     if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run" || a === "--all") {
       opts[a.slice(2)] = true;
     } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--to" || a === "--limit" || a === "--dedup-threshold") {
@@ -40,7 +41,7 @@ function parseArgs(argv) {
   return opts;
 }
 
-function resolveDir(root, dirOpt) {
+function resolveDir(root: string, dirOpt: string | undefined): string {
   if (!dirOpt) return join(root, "apps", "demo");
   return isAbsolute(dirOpt) ? dirOpt : resolve(process.cwd(), dirOpt);
 }
@@ -134,7 +135,7 @@ Global:
                         (default: <repo-root>/apps/demo)
 `;
 
-async function main() {
+async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const opts = parseArgs(argv);
   const cmd = opts._[0];
@@ -146,9 +147,9 @@ async function main() {
       return runGraph(dir, opts);
     case "affected":
       if (opts._[1]) {
-        const { runNodeAffected } = await import("../src/node-affected.mjs");
-        const { loadModel } = await import("../src/load.mjs");
-        return runNodeAffected(loadModel(dir), root, opts._[1], opts);
+        const { runNodeAffected } = await import("../src/node-affected.ts");
+        const { loadModel } = await import("../src/load.ts");
+        return runNodeAffected(loadModel(dir), root, opts._[1]!, opts);
       }
       return runAffected(dir, root, opts);
     case "infer":
@@ -159,36 +160,36 @@ async function main() {
     case "compare":
       return await runTracing(cmd, root, opts);
     case "learn": {
-      const { runLearn } = await import("../src/learn.mjs");
+      const { runLearn } = await import("../src/learn.ts");
       return await runLearn(root, opts);
     }
     case "propose": {
-      const { runPropose } = await import("../src/propose.mjs");
+      const { runPropose } = await import("../src/propose.ts");
       return await runPropose(root, opts);
     }
     case "proposals": {
-      const { runProposals } = await import("../src/proposals.mjs");
+      const { runProposals } = await import("../src/proposals.ts");
       return await runProposals(root, opts);
     }
     case "approve": {
-      const { runApprove } = await import("../src/review.mjs");
+      const { runApprove } = await import("../src/review.ts");
       return await runApprove(root, opts._[1], opts);
     }
     case "reject": {
-      const { runReject } = await import("../src/review.mjs");
+      const { runReject } = await import("../src/review.ts");
       return await runReject(root, opts._[1]);
     }
     case "sync":
     case "sync-check": {
-      const { runSyncCommand } = await import("../src/sync-check.mjs");
+      const { runSyncCommand } = await import("../src/sync-check.ts");
       return await runSyncCommand(root, opts._[1], opts);
     }
     case "rollback": {
-      const { runRollback } = await import("../src/rollback.mjs");
+      const { runRollback } = await import("../src/rollback.ts");
       return await runRollback(root, opts._[1], opts);
     }
     case "reembed": {
-      const { runReembed } = await import("../src/reembed.mjs");
+      const { runReembed } = await import("../src/reembed.ts");
       return await runReembed(root, opts);
     }
     case "help":

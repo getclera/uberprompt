@@ -4,16 +4,20 @@
   "description": "uberprompt — dependency graph + semantic-sync CLI for prompt fragments",
   "type": "module",
   "bin": {
-    "uberprompt": "./bin/uberprompt.mjs"
+    "uberprompt": "./bin/uberprompt.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.41",
     "ai": "^7.0.65",
     "archy": "^1.0.0",
-    "mongodb": "^6.18.0",
-    "openai": "^7.4.0"
+    "mongodb": "^6.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.6.0"
   },
   "scripts": {
-    "test": "node --test"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.ts\""
   }
 }

@@ -8,28 +8,49 @@
 // already drawn in the current tree is repeated as a leaf marked "↩ shown above"
 // instead of re-expanding its subtree.
 import archy from "archy";
-import { refNodeId } from "./load.mjs";
+import { refNodeId } from "./load.ts";
+import type { FwdEntry, Graph, Palette, RenderModel } from "./types.ts";
+
+interface EdgeLike {
+  to?: string;
+  from?: string;
+  kind: string;
+  note?: string;
+  confidence?: number;
+}
+
+interface Adjacency {
+  get(node: string): EdgeLike[] | undefined;
+}
+
+interface TreeNode {
+  label: string;
+  nodes: TreeNode[];
+}
 
 const CODES = { cyan: 36, green: 32, yellow: 33, magenta: 35, dim: 2, bold: 1 };
 
-export function makePalette(enabled) {
-  const wrap = (code) => (s) => (enabled ? `\x1b[${code}m${s}\x1b[0m` : s);
-  const p = {};
-  for (const [name, code] of Object.entries(CODES)) p[name] = wrap(code);
+export function makePalette(enabled: boolean): Palette {
+  const wrap = (code: number) => (s: string) =>
+    enabled ? `\x1b[${code}m${s}\x1b[0m` : s;
+  const p = {} as Palette;
+  for (const [name, code] of Object.entries(CODES)) {
+    p[name as keyof Palette] = wrap(code);
+  }
   return p;
 }
 
-export function colorsEnabled(opts = {}) {
+export function colorsEnabled(opts: Record<string, unknown> = {}): boolean {
   if (opts["no-color"] || process.env.NO_COLOR) return false;
   return Boolean(process.stdout.isTTY);
 }
 
-export function buildForward(model) {
-  const fwd = new Map();
+export function buildForward(model: RenderModel): Map<string, FwdEntry[]> {
+  const fwd = new Map<string, FwdEntry[]>();
   for (const edge of model.edges) {
     const from = refNodeId(edge.from);
     if (!fwd.has(from)) fwd.set(from, []);
-    fwd.get(from).push({
+    fwd.get(from)!.push({
       to: refNodeId(edge.to),
       kind: edge.kind,
       note: edge.note,
@@ -39,13 +60,13 @@ export function buildForward(model) {
   return fwd;
 }
 
-function nodeKind(model, node) {
+function nodeKind(model: RenderModel, node: string): "prompt" | "fragment" | "local" {
   if (model.prompts.has(node)) return "prompt";
   if (model.fragments.has(node)) return "fragment";
   return "local";
 }
 
-function nodeLabel(model, node, c) {
+function nodeLabel(model: RenderModel, node: string, c: Palette): string {
   const kind = nodeKind(model, node);
   if (kind === "prompt") return c.cyan(c.bold(node));
   if (kind === "fragment") return c.green(node);
@@ -53,7 +74,7 @@ function nodeLabel(model, node, c) {
   return c.cyan(node.slice(0, dot)) + "." + c.magenta(node.slice(dot + 1));
 }
 
-function edgeSuffix(edge, c) {
+function edgeSuffix(edge: EdgeLike, c: Palette): string {
   if (edge.kind === "uses") return " " + c.dim("[uses]");
   if (edge.kind === "semantic") {
     const conf = edge.confidence != null ? ` ${edge.confidence.toFixed(2)}` : "";
@@ -62,7 +83,14 @@ function edgeSuffix(edge, c) {
   return " " + c.dim(`[${edge.kind}]`);
 }
 
-function subtree(model, adjacency, node, edge, c, seen) {
+function subtree(
+  model: RenderModel,
+  adjacency: Adjacency,
+  node: string,
+  edge: EdgeLike | null,
+  c: Palette,
+  seen: Set<string>
+): TreeNode {
   let label = nodeLabel(model, node, c);
   if (edge) label += edgeSuffix(edge, c);
   if (seen.has(node)) {
@@ -77,28 +105,31 @@ function subtree(model, adjacency, node, edge, c, seen) {
   return { label, nodes };
 }
 
-const childTarget = (edge) => edge.to ?? edge.from;
+const childTarget = (edge: EdgeLike): string => (edge.to ?? edge.from)!;
 
-export function renderPromptForest(model, opts = {}) {
+export function renderPromptForest(
+  model: RenderModel,
+  opts: { colors?: boolean } = {}
+): string {
   const c = makePalette(opts.colors ?? false);
   const fwd = buildForward(model);
 
-  const localsByPrompt = new Map();
+  const localsByPrompt = new Map<string, string[]>();
   for (const from of fwd.keys()) {
     const dot = from.indexOf(".");
     if (dot === -1) continue;
     const owner = from.slice(0, dot);
     if (!localsByPrompt.has(owner)) localsByPrompt.set(owner, []);
-    localsByPrompt.get(owner).push(from);
+    localsByPrompt.get(owner)!.push(from);
   }
 
-  const lines = [];
+  const lines: string[] = [];
   for (const name of [...model.prompts.keys()].sort()) {
     const seen = new Set([name]);
     const direct = (fwd.get(name) || []).map((edge) =>
       subtree(model, fwd, edge.to, edge, c, seen)
     );
-    const locals = (localsByPrompt.get(name) || []).sort().map((local) => {
+    const locals = (localsByPrompt.get(name) || []).sort().map((local): TreeNode => {
       const key = local.slice(local.indexOf(".") + 1);
       const children = (fwd.get(local) || []).map((edge) =>
         subtree(model, fwd, edge.to, edge, c, seen)
@@ -110,11 +141,16 @@ export function renderPromptForest(model, opts = {}) {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
-export function renderImpactTree(model, graph, start, opts = {}) {
+export function renderImpactTree(
+  model: RenderModel,
+  graph: Graph,
+  start: string,
+  opts: { colors?: boolean } = {}
+): string {
   const c = makePalette(opts.colors ?? false);
-  const adjacency = {
-    get(node) {
-      const deps = [...(graph.rev.get(node) || [])];
+  const adjacency: Adjacency = {
+    get(node: string): EdgeLike[] {
+      const deps: EdgeLike[] = [...(graph.rev.get(node) || [])];
       const owner = graph.owningPrompt(node);
       if (owner) deps.push({ from: owner, kind: "contains" });
       return deps;
@@ -122,8 +158,8 @@ export function renderImpactTree(model, graph, start, opts = {}) {
   };
   const seen = new Set([start]);
   const nodes = adjacency
-    .get(start)
-    .map((edge) => subtree(model, adjacency, edge.from, edge, c, seen));
+    .get(start)!
+    .map((edge) => subtree(model, adjacency, childTarget(edge), edge, c, seen));
   const header = nodeLabel(model, start, c) + " " + c.dim("— change ripples to:");
   if (nodes.length === 0) return header + "\n└── " + c.dim("(no dependents)") + "\n";
   return archy({ label: header, nodes });

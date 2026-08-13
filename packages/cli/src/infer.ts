@@ -5,18 +5,26 @@
 // optional merge into edges.json.
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { loadModel, nonEmptyFragments, refNodeId } from "./load.mjs";
+import { loadModel, nonEmptyFragments, refNodeId } from "./load.ts";
+import type { CliOpts, Model, Ref } from "./types.ts";
 
 const MODEL = "gpt-5-nano";
 
-function loadApiKey(repoRoot) {
+interface InferEdge {
+  from: { prompt?: string | null; fragment: string };
+  to: { fragment?: string };
+  confidence?: number;
+  reason?: string;
+}
+
+function loadApiKey(repoRoot: string): string | null {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
   const envPath = join(repoRoot, ".env");
   if (existsSync(envPath)) {
     for (const line of readFileSync(envPath, "utf8").split("\n")) {
       const m = line.match(/^\s*(?:export\s+)?OPENAI_API_KEY\s*=\s*(.+)\s*$/);
       if (m) {
-        let v = m[1].trim();
+        let v = m[1]!.trim();
         if (
           (v.startsWith('"') && v.endsWith('"')) ||
           (v.startsWith("'") && v.endsWith("'"))
@@ -33,7 +41,10 @@ function loadApiKey(repoRoot) {
 const TOOL_DESCRIPTION =
   "Report semantic-dependency edges between prompt fragments. A semantic edge means two fragments restate, paraphrase, or constrain the SAME underlying rule (e.g. the same threshold, policy, or trigger) in their own words, such that editing one should trigger a review of the other.";
 
-function buildEdgeSchema(model, frags) {
+function buildEdgeSchema(
+  model: Model,
+  frags: { key: string }[]
+): Record<string, unknown> {
   const sharedKeys = [...model.fragments.keys()];
   const promptNames = [...model.prompts.keys()];
   const fragmentKeys = [...new Set(frags.map((f) => f.key))];
@@ -74,8 +85,8 @@ function buildEdgeSchema(model, frags) {
 }
 
 // Pairs already tied by a declared "uses" edge from that prompt — never re-infer.
-function usesPairKeys(model) {
-  const s = new Set();
+function usesPairKeys(model: Model): Set<string> {
+  const s = new Set<string>();
   for (const e of model.edges) {
     if (e.kind !== "uses") continue;
     if (e.from.prompt && e.to.fragment) {
@@ -85,7 +96,7 @@ function usesPairKeys(model) {
   return s;
 }
 
-function edgeExists(model, from, to) {
+function edgeExists(model: Model, from: Ref, to: Ref): boolean {
   const fromId = refNodeId(from);
   const toId = refNodeId(to);
   return model.edges.some(
@@ -93,7 +104,7 @@ function edgeExists(model, from, to) {
   );
 }
 
-export async function runInfer(dir, repoRoot, opts) {
+export async function runInfer(dir: string, repoRoot: string, opts: CliOpts): Promise<number> {
   const threshold = opts.threshold != null ? opts.threshold : 0.7;
   const apiKey = loadApiKey(repoRoot);
   if (!apiKey) {
@@ -136,17 +147,18 @@ export async function runInfer(dir, repoRoot, opts) {
   const { createOpenAI } = await import("@ai-sdk/openai");
   const provider = createOpenAI({ apiKey });
 
+  const schema = buildEdgeSchema(model, frags) as Parameters<typeof jsonSchema>[0];
   const { output } = await generateText({
     model: provider(MODEL),
-    output: Output.object({ schema: jsonSchema(buildEdgeSchema(model, frags)) }),
+    output: Output.object({ schema: jsonSchema(schema) }),
     prompt: `${TOOL_DESCRIPTION}\n\n${prompt}`,
     telemetry: { functionId: "cli-infer" },
   });
 
-  const raw = output?.edges || [];
+  const raw = (output as { edges?: InferEdge[] } | undefined)?.edges || [];
 
   const usesPairs = usesPairKeys(model);
-  const proposed = [];
+  const proposed: InferEdge[] = [];
   for (const e of raw) {
     if (!e.from || !e.to || !e.to.fragment) continue;
     if (e.from.prompt === null) delete e.from.prompt;
@@ -184,7 +196,7 @@ export async function runInfer(dir, repoRoot, opts) {
         ? `${e.from.prompt}.${e.from.fragment}`
         : e.from.fragment;
       console.log(
-        `  ${from} -> ${e.to.fragment}  conf=${e.confidence.toFixed(2)}`
+        `  ${from} -> ${e.to.fragment}  conf=${(e.confidence ?? 0).toFixed(2)}`
       );
       console.log(`    ${e.reason}`);
     }

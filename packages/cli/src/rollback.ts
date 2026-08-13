@@ -1,18 +1,34 @@
 import { createHash } from "node:crypto";
-import { loadEnv, requireEnv, connect, voyageEmbedBatch } from "./store.mjs";
-import { diffFragments } from "./sync-check.mjs";
+import type { Db, ObjectId, WithId } from "mongodb";
+import { loadEnv, requireEnv, connect, voyageEmbedBatch } from "./store.ts";
+import { diffFragments } from "./sync-check.ts";
+import type { Change } from "./sync-check.ts";
+import type { Fragment, PromptDoc } from "./types.ts";
 
-function contentHash(doc, sorted) {
+interface VersionedPrompt extends PromptDoc {
+  contentHash?: string;
+  template?: string;
+}
+
+interface SnapshotDoc extends VersionedPrompt {
+  promptName: string;
+  frozenAt?: Date;
+}
+
+function contentHash(doc: { template?: string; fragments: Fragment[] }, sorted: boolean): string {
   const fragments = doc.fragments.map((f) => ({ key: f.key, text: f.text }));
   if (sorted) fragments.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const canon = { template: doc.template, fragments };
   return createHash("sha256").update(JSON.stringify(canon)).digest("hex");
 }
 
-async function snapshotVersion(db, prompt) {
+async function snapshotVersion(
+  db: Db,
+  prompt: WithId<VersionedPrompt>
+): Promise<{ versionId: ObjectId; created: boolean }> {
   const hash = contentHash(prompt, true);
   const legacyHash = contentHash(prompt, false);
-  const versions = db.collection("prompt_versions");
+  const versions = db.collection<SnapshotDoc>("prompt_versions");
   const existing = await versions.findOne({
     promptName: prompt.name,
     version: prompt.version,
@@ -36,7 +52,11 @@ async function snapshotVersion(db, prompt) {
   return { versionId: insertedId, created: true };
 }
 
-export async function runRollback(repoRoot, promptName, opts = {}) {
+export async function runRollback(
+  repoRoot: string,
+  promptName: string | undefined,
+  opts: { to?: unknown; "dry-run"?: boolean; "no-sync"?: boolean; model?: string } = {}
+): Promise<number> {
   if (!promptName) {
     console.error("usage: uberprompt rollback <prompt> [--to <version>] [--dry-run]");
     return 1;
@@ -44,19 +64,19 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "VOYAGE_API_KEY", "OPENAI_API_KEY"]);
   const { client, db } = await connect(env);
-  let restored;
+  let restored: { changes: Change[]; refId: ObjectId };
   try {
-    const current = await db.collection("prompts").findOne({ name: promptName });
+    const current = await db.collection<VersionedPrompt>("prompts").findOne({ name: promptName });
     if (!current) throw new Error(`prompt "${promptName}" not found`);
-    let snapshot;
+    let snapshot: WithId<SnapshotDoc> | null;
     if (opts.to !== undefined) {
       const toVersion = Number(opts.to);
       if (!Number.isInteger(toVersion)) throw new Error(`--to must be an integer version, got "${opts.to}"`);
-      snapshot = await db.collection("prompt_versions").findOne({ promptName, version: toVersion });
+      snapshot = await db.collection<SnapshotDoc>("prompt_versions").findOne({ promptName, version: toVersion });
       if (!snapshot) throw new Error(`no prompt_versions snapshot for ${promptName} v${toVersion}`);
     } else {
       snapshot = await db
-        .collection("prompt_versions")
+        .collection<SnapshotDoc>("prompt_versions")
         .find({ promptName, version: { $lt: current.version } })
         .sort({ version: -1 })
         .limit(1)
@@ -79,8 +99,8 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
     const currentByKey = new Map(current.fragments.map((f) => [f.key, f]));
     const toEmbed = changes.filter((c) => c.newText);
     const vectors = await voyageEmbedBatch(env, toEmbed.map((c) => c.newText));
-    const freshByKey = new Map(toEmbed.map((c, i) => [c.key, vectors[i]]));
-    const fragments = snapshot.fragments.map((f) => {
+    const freshByKey = new Map(toEmbed.map((c, i) => [c.key, vectors[i]!]));
+    const fragments = snapshot.fragments.map((f): Fragment => {
       const cur = currentByKey.get(f.key);
       if (cur && cur.text === f.text) {
         return cur.embedding ? { key: f.key, text: f.text, embedding: cur.embedding } : { key: f.key, text: f.text };
@@ -91,7 +111,7 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
     const newVersion = current.version + 1;
     const updatedAt = new Date();
     const restoredHash = contentHash({ template: snapshot.template, fragments }, true);
-    const res = await db.collection("prompts").updateOne(
+    const res = await db.collection<VersionedPrompt>("prompts").updateOne(
       { _id: current._id, version: current.version },
       {
         $set: {
@@ -117,7 +137,7 @@ export async function runRollback(repoRoot, promptName, opts = {}) {
     await client.close();
   }
   if (opts["no-sync"]) return 0;
-  const { runSyncCheck } = await import("./sync.mjs");
+  const { runSyncCheck } = await import("./sync-check.ts");
   for (const change of restored.changes) {
     const code = await runSyncCheck(repoRoot, promptName, change.key, change.newText, {
       oldText: change.oldText,

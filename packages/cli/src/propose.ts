@@ -1,3 +1,5 @@
+import type { Db } from "mongodb";
+import type { OpenAIProvider } from "./store.ts";
 import {
   loadEnv,
   requireEnv,
@@ -5,14 +7,21 @@ import {
   openaiClient,
   structuredCall,
   truncate,
-} from "./store.mjs";
+} from "./store.ts";
+import type { CliOpts, LessonDoc, PromptDoc, Tool } from "./types.ts";
+
+interface Edit {
+  fragment: string;
+  newText: string;
+  reason: string;
+}
 
 const DEFAULT_MODEL = "gpt-5.1";
 const RAG_INDEX = "descriptions_embedding";
 const RAG_MIN_SCORE = 0.7;
 const RAG_LIMIT = 5;
 
-const CATALOG_TOOL = {
+const CATALOG_TOOL: Tool = {
   name: "report_applicable_prompts",
   description:
     "Report which prompts from the catalog a production lesson applies to. Only name prompts whose instructions would actually change if the lesson were folded in.",
@@ -37,7 +46,7 @@ const CATALOG_TOOL = {
   },
 };
 
-function rewriteTool(keys) {
+function rewriteTool(keys: string[]): Tool {
   return {
     name: "propose_fragment_edits",
     description:
@@ -65,7 +74,7 @@ function rewriteTool(keys) {
   };
 }
 
-function catalogListing(prompts) {
+function catalogListing(prompts: PromptDoc[]): string {
   return prompts
     .map((p) => {
       const desc = p.description ? `\n  description: ${p.description}` : "";
@@ -75,7 +84,12 @@ function catalogListing(prompts) {
     .join("\n");
 }
 
-async function catalogTargets(ai, model, prompts, lesson) {
+async function catalogTargets(
+  ai: OpenAIProvider,
+  model: string,
+  prompts: PromptDoc[],
+  lesson: LessonDoc
+): Promise<string[]> {
   const prompt =
     "A production lesson was learned from LLM traces. Given the full prompt catalog, " +
     "pick the prompts this lesson applies to — prompts whose instructions would have to " +
@@ -84,11 +98,16 @@ async function catalogTargets(ai, model, prompts, lesson) {
     (lesson.reason ? `Why it was learned: ${lesson.reason}\n` : "") +
     "\nPrompt catalog:\n" +
     catalogListing(prompts);
-  const out = await structuredCall(ai, model, prompt, CATALOG_TOOL);
+  const out = await structuredCall<{ prompts?: { name: string }[] }>(
+    ai,
+    model,
+    prompt,
+    CATALOG_TOOL
+  );
   return (out.prompts || []).map((p) => p.name);
 }
 
-async function ragTargets(db, prompts, lesson) {
+async function ragTargets(db: Db, prompts: PromptDoc[], lesson: LessonDoc): Promise<string[]> {
   if (!prompts.some((p) => Array.isArray(p.descriptionEmbedding))) {
     console.error("  RAG rung SKIPPED: no prompt has descriptionEmbedding");
     return [];
@@ -115,12 +134,17 @@ async function ragTargets(db, prompts, lesson) {
       .toArray();
     return hits.filter((h) => h.score >= RAG_MIN_SCORE).map((h) => h.name);
   } catch (err) {
-    console.error(`  RAG rung SKIPPED: $vectorSearch failed: ${err.message}`);
+    console.error(`  RAG rung SKIPPED: $vectorSearch failed: ${(err as Error).message}`);
     return [];
   }
 }
 
-async function proposeEdits(ai, model, promptDoc, lesson) {
+async function proposeEdits(
+  ai: OpenAIProvider,
+  model: string,
+  promptDoc: PromptDoc,
+  lesson: LessonDoc
+): Promise<Edit[]> {
   const editable = promptDoc.fragments.filter((f) => f.text);
   const listing = editable
     .map((f) => `- key: ${f.key}\n  text: ${JSON.stringify(f.text)}`)
@@ -136,14 +160,14 @@ async function proposeEdits(ai, model, promptDoc, lesson) {
     "each. Change as little wording as possible — preserve everything the lesson does " +
     "not require changing. The `fragment` field must be one of the listed keys, never " +
     "the fragment text. If the prompt already complies with the lesson, return no edits.";
-  const out = await structuredCall(
+  const out = await structuredCall<{ edits?: Edit[] }>(
     ai,
     model,
     prompt,
     rewriteTool(editable.map((f) => f.key))
   );
-  const seen = new Set();
-  const edits = [];
+  const seen = new Set<string>();
+  const edits: Edit[] = [];
   for (const e of out.edits || []) {
     if (seen.has(e.fragment)) continue;
     seen.add(e.fragment);
@@ -152,7 +176,13 @@ async function proposeEdits(ai, model, promptDoc, lesson) {
   return edits;
 }
 
-async function fileProposal(db, promptDoc, edit, lesson, dryRun) {
+async function fileProposal(
+  db: Db,
+  promptDoc: PromptDoc,
+  edit: Edit,
+  lesson: LessonDoc,
+  dryRun: boolean
+): Promise<number> {
   const frag = promptDoc.fragments.find((f) => f.key === edit.fragment);
   if (!frag) {
     console.error(`    unknown fragment "${edit.fragment}" — dropped`);
@@ -194,7 +224,7 @@ async function fileProposal(db, promptDoc, edit, lesson, dryRun) {
   return 1;
 }
 
-export async function runPropose(repoRoot, opts) {
+export async function runPropose(repoRoot: string, opts: CliOpts): Promise<number> {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY"]);
   const model = opts.model || DEFAULT_MODEL;
@@ -202,7 +232,7 @@ export async function runPropose(repoRoot, opts) {
   const { client, db } = await connect(env);
   try {
     const lessons = await db
-      .collection("lessons")
+      .collection<LessonDoc>("lessons")
       .find({ processedAt: { $exists: false }, status: { $ne: "superseded" } })
       .sort({ ts: 1 })
       .toArray();
@@ -210,7 +240,7 @@ export async function runPropose(repoRoot, opts) {
       console.log("No unprocessed lessons.");
       return 0;
     }
-    const prompts = await db.collection("prompts").find({}).toArray();
+    const prompts = await db.collection<PromptDoc>("prompts").find({}).toArray();
     if (prompts.length === 0) {
       throw new Error("prompts collection is empty — seed prompts before proposing");
     }
@@ -220,7 +250,7 @@ export async function runPropose(repoRoot, opts) {
 
     for (const lesson of lessons) {
       console.log(`\nlesson ${lesson._id}: ${truncate(lesson.text, 110)}`);
-      const targets = new Map();
+      const targets = new Map<string, string>();
       for (const name of lesson.appliesTo || []) {
         if (byName.has(name)) targets.set(name, "lineage");
         else console.error(`  lineage target "${name}" not in prompts — skipped`);
@@ -236,10 +266,10 @@ export async function runPropose(repoRoot, opts) {
       let filed = 0;
       for (const [name, rung] of targets) {
         console.log(`  target ${name} [${rung}]`);
-        const edits = await proposeEdits(ai, model, byName.get(name), lesson);
+        const edits = await proposeEdits(ai, model, byName.get(name)!, lesson);
         if (edits.length === 0) console.log("    already complies — no edits");
         for (const edit of edits) {
-          filed += await fileProposal(db, byName.get(name), edit, lesson, dryRun);
+          filed += await fileProposal(db, byName.get(name)!, edit, lesson, dryRun);
         }
       }
       totalFiled += filed;

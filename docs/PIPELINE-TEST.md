@@ -9,10 +9,10 @@ All numbers below are from real command output against the shared cluster.
 ### 1. Install + CLI boot
 
 `pnpm install --config.minimum-release-age=0` → 53 packages, done in 1.1s.
-`node packages/cli/bin/uberprompt.mjs --help` → prints full usage, exit 0.
+`node packages/cli/bin/uberprompt.ts --help` → prints full usage, exit 0.
 
-The earlier `ERR_MODULE_NOT_FOUND` on main is **not a main bug**: `bin/uberprompt.mjs`
-eagerly imports `src/graph-cmd.mjs` → `src/render.mjs` → external `archy`, so *any*
+The earlier `ERR_MODULE_NOT_FOUND` on main is **not a main bug**: `bin/uberprompt.ts`
+eagerly imports `src/graph-cmd.ts` → `src/render.ts` → external `archy`, so *any*
 invocation (even `--help`) throws module-not-found in a checkout without a workspace
 install. After `pnpm install` it runs clean. Remedy is just the install (with the
 `minimum-release-age=0` flag per CLAUDE.md).
@@ -54,13 +54,13 @@ Verified directly against the cluster afterwards:
 Per the user mid-run: Felix supplies a **function** (pass a prompt, get its
 dependents/dependencies back) — there is no change-stream listener to find.
 
-**Felix's function, located on main** (`packages/cli/src/graph.mjs`):
+**Felix's function, located on main** (`packages/cli/src/graph.ts`):
 `buildGraph(model)` + `dependentsOf(graph, node)` / `dependenciesOf(graph, node)`.
 They are **pure functions over a model object** `{ prompts: Map, edges: [] }` —
 `buildGraph` never reads `model.fragments` and touches no files. The file-based
-part is only the loader: `loadModel(dir)` (`load.mjs`) builds that model from
+part is only the loader: `loadModel(dir)` (`load.ts`) builds that model from
 `apps/demo` JSON, and `runNodeAffected(model, repoRoot, input, opts)`
-(`node-affected.mjs`) is the CLI wrapper. Node ids: `"prompt"`, `"shared-frag"`,
+(`node-affected.ts`) is the CLI wrapper. Node ids: `"prompt"`, `"shared-frag"`,
 `"prompt.local-frag"`; edge entries `{from, to, kind, note?, confidence?}` —
 **exactly the shape of the Mongo `edges` docs**, since `edges.json` mirrors the
 collection. So the file/Mongo mismatch is confined to the loader, and the adapter
@@ -75,7 +75,7 @@ fully merged (no hidden stage-4 branch); the pre-alignment salvage
 
 ## The integration prototype — `uberprompt sync-check` (this PR)
 
-`packages/cli/src/sync-check.mjs`, wired as a CLI subcommand. Shape:
+`packages/cli/src/sync-check.ts`, wired as a CLI subcommand. Shape:
 
 ```
 approve (bump) → sync-check <prompt>:
@@ -114,11 +114,11 @@ Both honest "consistent" — the applied change *agrees* with the escalation
 criteria, so the converge loop terminates in wave 1 with the graph quiet. The
 dependents walk over Mongo-shaped edges (prompt-level dependents expanding into
 their non-empty fragments, changed-prompt exclusion, `uses`+`semantic` mixing) is
-covered by `packages/cli/test/sync-check.test.mjs` — suite: 24 pass.
+covered by `packages/cli/test/sync-check.test.ts` — suite: 24 pass.
 
 ### Recommended final wiring
 
-`approve` (review.mjs) after the version bump → call `runSyncCheck(prompt)` inline
+`approve` (review.ts) after the version bump → call `runSyncCheck(prompt)` inline
 (same process, no event bus needed) → sync-check proposals land as `pending` →
 human approves → that approve triggers sync-check again → waves shrink until
 quiet. The version-bump *diff signal* comes from `prompt_versions` (current doc vs
@@ -148,7 +148,7 @@ of the loop; what remains missing is the **undeclared-dependent layer**:
 ## Seam bugs found (beyond "stage 4 was not wired")
 
 1. **IDEA.md's trigger contract is stale.** It says stage 4 watches
-   `prompt_versions` *inserts* — but `runApprove` (packages/cli/src/review.mjs)
+   `prompt_versions` *inserts* — but `runApprove` (packages/cli/src/review.ts)
    only snapshots the PRE-change version, and in this run even that was a no-op
    ("snapshot reused"): **zero inserts** fired. With the function-call wiring
    (user's clarification) no event is needed — approve should invoke sync-check

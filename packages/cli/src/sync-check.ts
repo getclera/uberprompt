@@ -1,5 +1,6 @@
 import { readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import type { Db } from "mongodb";
 import {
   loadEnv,
   requireEnv,
@@ -10,16 +11,18 @@ import {
   voyageEmbed,
   cosine,
   VOYAGE_EMBED_MODEL,
-} from "./store.mjs";
-import { buildGraph, dependentsOf } from "./graph.mjs";
-import { refNodeId } from "./load.mjs";
+} from "./store.ts";
+import type { OpenAIProvider } from "./store.ts";
+import { buildGraph, dependentsOf } from "./graph.ts";
+import { refNodeId } from "./load.ts";
+import type { CliEnv, Edge, Fragment, Graph, PromptDoc, Ref, RenderModel, Tool } from "./types.ts";
 
 const DEFAULT_MODEL = "gpt-5.1";
 const SEMANTIC_THRESHOLD = 0.8;
 const SEMANTIC_TOP_K = 5;
 const VECTOR_INDEX = "fragments_embedding";
 
-const CONSISTENCY_TOOL = {
+const CONSISTENCY_TOOL: Tool = {
   name: "report_consistency",
   description:
     "Judge whether a dependent prompt fragment still agrees with the new text of a fragment that just changed. If they now contradict each other, return the minimal rewrite of the dependent fragment that restores consistency.",
@@ -35,23 +38,62 @@ const CONSISTENCY_TOOL = {
   },
 };
 
-export function modelFromMongo(prompts, edges) {
+interface ConsistencyVerdict {
+  consistent: boolean;
+  reason: string;
+  newText: string | null;
+}
+
+export interface Change {
+  key: string;
+  oldText: string;
+  newText: string;
+}
+
+interface Target {
+  prompt: PromptDoc;
+  fragment: string;
+  via: string[];
+  kind: string;
+}
+
+interface SemanticRow {
+  name: string;
+  fragments?: Fragment[];
+}
+
+interface SemanticHit {
+  prompt: string;
+  fragment: string;
+  score: number;
+}
+
+interface SnapshotDoc {
+  promptName: string;
+  version: number;
+  fragments: Fragment[];
+}
+
+export function modelFromMongo(prompts: PromptDoc[], edges: Edge[]): RenderModel {
   return {
-    prompts: new Map(prompts.map((p) => [p.name, p])),
-    fragments: new Map(),
+    prompts: new Map(prompts.map((p): [string, PromptDoc] => [p.name, p])),
+    fragments: new Map<string, Fragment>(),
     edges,
   };
 }
 
-export function diffFragments(current, snapshot) {
+export function diffFragments(
+  current: { fragments: Fragment[] },
+  snapshot: { fragments: Fragment[] }
+): Change[] {
   const old = new Map(snapshot.fragments.map((f) => [f.key, f.text]));
   return current.fragments
     .filter((f) => f.text && old.get(f.key) !== undefined && old.get(f.key) !== f.text)
-    .map((f) => ({ key: f.key, oldText: old.get(f.key), newText: f.text }));
+    .map((f) => ({ key: f.key, oldText: old.get(f.key)!, newText: f.text }));
 }
 
-export function sharedFragmentKeys(edges, repoRoot) {
-  const keys = new Set();
+export function sharedFragmentKeys(edges: Edge[], repoRoot: string): Set<string> {
+  const keys = new Set<string>();
   for (const edge of edges) {
     for (const ref of [edge.from, edge.to]) {
       if (ref && ref.fragment && !ref.prompt) keys.add(ref.fragment);
@@ -66,11 +108,16 @@ export function sharedFragmentKeys(edges, repoRoot) {
   return keys;
 }
 
-export function dependentTargets(graph, byName, changedPrompt, node) {
+export function dependentTargets(
+  graph: Graph,
+  byName: Map<string, PromptDoc>,
+  changedPrompt: string,
+  node: string
+): Target[] {
   const hits = dependentsOf(graph, node).filter(
     (e) => e.kind !== "contains" && e.node !== changedPrompt
   );
-  const targets = new Map();
+  const targets = new Map<string, Target>();
   for (const hit of hits) {
     const dot = hit.node.indexOf(".");
     const promptName = dot === -1 ? hit.node : hit.node.slice(0, dot);
@@ -90,10 +137,15 @@ export function dependentTargets(graph, byName, changedPrompt, node) {
   return [...targets.values()];
 }
 
-export function pickSemanticHits(rows, changedPrompt, queryVector, opts = {}) {
+export function pickSemanticHits(
+  rows: SemanticRow[],
+  changedPrompt: string,
+  queryVector: number[],
+  opts: { threshold?: number; topK?: number } = {}
+): SemanticHit[] {
   const threshold = opts.threshold ?? SEMANTIC_THRESHOLD;
   const topK = opts.topK ?? SEMANTIC_TOP_K;
-  const hits = [];
+  const hits: SemanticHit[] = [];
   for (const row of rows) {
     if (row.name === changedPrompt) continue;
     for (const frag of row.fragments || []) {
@@ -108,12 +160,12 @@ export function pickSemanticHits(rows, changedPrompt, queryVector, opts = {}) {
   return hits.slice(0, topK);
 }
 
-export function edgeEndpoints(changedRef, hitRef) {
+export function edgeEndpoints(changedRef: Ref, hitRef: Ref): { from: Ref; to: Ref } {
   if (!hitRef.prompt && changedRef.prompt) return { from: changedRef, to: hitRef };
   return { from: hitRef, to: changedRef };
 }
 
-export function hasEdgeBetween(edges, a, b) {
+export function hasEdgeBetween(edges: Edge[], a: Ref, b: Ref): boolean {
   const na = refNodeId(a);
   const nb = refNodeId(b);
   return edges.some((edge) => {
@@ -123,7 +175,13 @@ export function hasEdgeBetween(edges, a, b) {
   });
 }
 
-async function checkTarget(ai, model, change, changedPrompt, target) {
+async function checkTarget(
+  ai: OpenAIProvider,
+  model: string,
+  change: Change,
+  changedPrompt: string,
+  target: Target
+): Promise<(ConsistencyVerdict & { oldText: string }) | null> {
   const frag = target.prompt.fragments.find((f) => f.key === target.fragment);
   if (!frag || !frag.text) return null;
   const prompt =
@@ -134,11 +192,17 @@ async function checkTarget(ai, model, change, changedPrompt, target) {
     "Does the dependent fragment still agree with the new text? It is inconsistent only " +
     "if following both texts would produce contradictory behavior. If inconsistent, return " +
     "the complete new text for the dependent fragment, changing as little wording as possible.";
-  const out = await structuredCall(ai, model, prompt, CONSISTENCY_TOOL);
+  const out = await structuredCall<ConsistencyVerdict>(ai, model, prompt, CONSISTENCY_TOOL);
   return { ...out, oldText: frag.text };
 }
 
-async function fileSyncProposal(db, target, verdict, refId, dryRun) {
+async function fileSyncProposal(
+  db: Db,
+  target: Target,
+  verdict: ConsistencyVerdict & { oldText: string },
+  refId: unknown,
+  dryRun: boolean
+): Promise<number> {
   if (!verdict.newText || verdict.newText === verdict.oldText) {
     console.log("      inconsistent but no rewrite returned — dropped");
     return 0;
@@ -172,7 +236,25 @@ async function fileSyncProposal(db, target, verdict, refId, dryRun) {
   return 1;
 }
 
-async function discoverSemanticEdges(db, env, state, dryRun) {
+interface DiscoveryState {
+  promptName: string;
+  fragmentKey: string;
+  frag: Fragment;
+  newText: string;
+  prompts: PromptDoc[];
+  edges: Edge[];
+  sharedKeys: Set<string>;
+  byName: Map<string, PromptDoc>;
+  node: string;
+  targets: Map<string, Target>;
+}
+
+async function discoverSemanticEdges(
+  db: Db,
+  env: CliEnv,
+  state: DiscoveryState,
+  dryRun: boolean
+): Promise<void> {
   const { promptName, fragmentKey, frag, newText, prompts, edges, sharedKeys, byName, node, targets } = state;
   const queryVector =
     frag.text === newText && Array.isArray(frag.embedding)
@@ -180,7 +262,7 @@ async function discoverSemanticEdges(db, env, state, dryRun) {
       : await voyageEmbed(env, newText);
   const rows = await db
     .collection("prompts")
-    .aggregate([
+    .aggregate<SemanticRow>([
       {
         $vectorSearch: {
           index: VECTOR_INDEX,
@@ -208,13 +290,13 @@ async function discoverSemanticEdges(db, env, state, dryRun) {
   console.log(
     `  semantic discovery ($vectorSearch, cosine >= ${SEMANTIC_THRESHOLD}, top ${SEMANTIC_TOP_K}): ${hits.length} hit(s)`
   );
-  const changedRef = sharedKeys.has(fragmentKey)
+  const changedRef: Ref = sharedKeys.has(fragmentKey)
     ? { fragment: fragmentKey }
     : { prompt: promptName, fragment: fragmentKey };
-  const seenPairs = new Set();
+  const seenPairs = new Set<string>();
   for (const hit of hits) {
     console.log(`    ${hit.prompt}.${hit.fragment}  cosine ${hit.score.toFixed(3)}`);
-    const hitRef = sharedKeys.has(hit.fragment)
+    const hitRef: Ref = sharedKeys.has(hit.fragment)
       ? { fragment: hit.fragment }
       : { prompt: hit.prompt, fragment: hit.fragment };
     const { from, to } = edgeEndpoints(changedRef, hitRef);
@@ -243,9 +325,10 @@ async function discoverSemanticEdges(db, env, state, dryRun) {
       }
     }
     const id = `${hit.prompt}.${hit.fragment}`;
-    if (!targets.has(id)) {
+    const hitDoc = byName.get(hit.prompt);
+    if (hitDoc && !targets.has(id)) {
       targets.set(id, {
-        prompt: byName.get(hit.prompt),
+        prompt: hitDoc,
         fragment: hit.fragment,
         kind: "semantic",
         via: [node, "$vectorSearch"],
@@ -254,16 +337,22 @@ async function discoverSemanticEdges(db, env, state, dryRun) {
   }
 }
 
-export async function runSyncCheck(repoRoot, promptName, fragmentKey, newText, opts = {}) {
+export async function runSyncCheck(
+  repoRoot: string,
+  promptName: string,
+  fragmentKey: string,
+  newText: string,
+  opts: { model?: string; dryRun?: boolean; oldText?: string; refId?: unknown } = {}
+): Promise<number> {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"]);
   const model = opts.model || DEFAULT_MODEL;
   const dryRun = Boolean(opts.dryRun);
   const { client, db } = await connect(env);
   try {
-    const prompts = await db.collection("prompts").find({}).toArray();
-    const edges = await db.collection("edges").find({}).toArray();
-    const byName = new Map(prompts.map((p) => [p.name, p]));
+    const prompts = await db.collection<PromptDoc>("prompts").find({}).toArray();
+    const edges = await db.collection<Edge>("edges").find({}).toArray();
+    const byName = new Map<string, PromptDoc>(prompts.map((p) => [p.name, p]));
     const current = byName.get(promptName);
     if (!current) throw new Error(`prompt "${promptName}" not found`);
     const frag = current.fragments.find((f) => f.key === fragmentKey);
@@ -273,7 +362,7 @@ export async function runSyncCheck(repoRoot, promptName, fragmentKey, newText, o
     let oldText = opts.oldText;
     if (oldText === undefined) {
       const snapshot = await db
-        .collection("prompt_versions")
+        .collection<SnapshotDoc>("prompt_versions")
         .find({ promptName, version: { $lt: current.version } })
         .sort({ version: -1 })
         .limit(1)
@@ -294,7 +383,7 @@ export async function runSyncCheck(repoRoot, promptName, fragmentKey, newText, o
     const sharedKeys = sharedFragmentKeys(edges, repoRoot);
     const graph = buildGraph(modelFromMongo(prompts, edges));
     const nodes = [node, ...(sharedKeys.has(fragmentKey) ? [fragmentKey] : [])];
-    const targets = new Map();
+    const targets = new Map<string, Target>();
     for (const n of nodes) {
       for (const t of dependentTargets(graph, byName, promptName, n)) {
         const id = `${t.prompt.name}.${t.fragment}`;
@@ -311,7 +400,7 @@ export async function runSyncCheck(repoRoot, promptName, fragmentKey, newText, o
       { promptName, fragmentKey, frag, newText, prompts, edges, sharedKeys, byName, node, targets },
       dryRun
     );
-    const change = { key: fragmentKey, oldText, newText };
+    const change: Change = { key: fragmentKey, oldText, newText };
     const ai = await openaiClient(env);
     let filed = 0;
     console.log(`  consistency check (${model}) over ${targets.size} dependent fragment(s):`);
@@ -340,7 +429,11 @@ export async function runSyncCheck(repoRoot, promptName, fragmentKey, newText, o
   }
 }
 
-export async function runSyncCommand(repoRoot, targetArg, opts = {}) {
+export async function runSyncCommand(
+  repoRoot: string,
+  targetArg: string | undefined,
+  opts: { model?: string; "dry-run"?: boolean } = {}
+): Promise<number> {
   if (!targetArg) {
     console.error("usage: uberprompt sync <prompt[.fragment]> [--dry-run] [--model <m>]");
     return 1;
@@ -351,16 +444,16 @@ export async function runSyncCommand(repoRoot, targetArg, opts = {}) {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB"]);
   const { client, db } = await connect(env);
-  let changes;
-  let refId = null;
+  let changes: Change[];
+  let refId: unknown = null;
   try {
-    const current = await db.collection("prompts").findOne({ name: promptName });
+    const current = await db.collection<PromptDoc>("prompts").findOne({ name: promptName });
     if (!current) throw new Error(`prompt "${promptName}" not found`);
     if (fragmentKey && !current.fragments.some((f) => f.key === fragmentKey)) {
       throw new Error(`fragment "${fragmentKey}" not found in prompt "${promptName}"`);
     }
     const snapshot = await db
-      .collection("prompt_versions")
+      .collection<SnapshotDoc>("prompt_versions")
       .find({ promptName, version: { $lt: current.version } })
       .sort({ version: -1 })
       .limit(1)
@@ -377,7 +470,7 @@ export async function runSyncCommand(repoRoot, targetArg, opts = {}) {
       `${promptName} v${snapshot.version} -> v${current.version}: ${changes.length} changed fragment(s): ${changes.map((c) => c.key).join(", ") || "none"}`
     );
     const currentSnap = await db
-      .collection("prompt_versions")
+      .collection<SnapshotDoc>("prompt_versions")
       .findOne({ promptName, version: current.version });
     refId = currentSnap?._id ?? null;
   } finally {

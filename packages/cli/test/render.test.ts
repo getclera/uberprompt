@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph, dependentsOf } from "../src/graph.mjs";
-import { renderPromptForest, renderImpactTree } from "../src/render.mjs";
+import { buildGraph, dependentsOf } from "../src/graph.ts";
+import { renderPromptForest, renderImpactTree } from "../src/render.ts";
 
 function fixtureModel() {
   const fragments = new Map([

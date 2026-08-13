@@ -22,7 +22,7 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
 - [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
-- [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
+- [x] (felix/claude) Demo scenario runner (apply.ts, raise-escalation-threshold)
 - [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
 - [x] (felix/claude) CLI graph visualization: `uberprompt graph [node]` map/tree/impact views + tests
   - Evaluated external renderers for the map (beautiful-mermaid, diagonjs, d2, graph-easy):
@@ -57,13 +57,13 @@ branches listed in IDEA.md instead of rewriting.
         losses, baseline outputs are reused across retry attempts, and the win delta
         drops `lessonAdherence` so lesson-parroting alone can't clear the gate.
   - [x] (shlok) One approve path: `uberprompt approve` bridges to
-        `approveProposal` (sdk); `review.mjs`'s duplicate — which never wrote
+        `approveProposal` (sdk); `review.ts`'s duplicate — which never wrote
         `contentHash` and never inserted the new-version snapshot — is deleted.
-  - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
-    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
+  - Gotcha: the CLI's tsx bridges must spawn from a package dir, not the repo
+    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.ts` still spawns
     from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
 - [x] (felix + talwe+claude) 4 — Semantic sync check: `runSyncCheck`
-      (packages/cli/src/sync-check.mjs, extends felix's prototype) runs inline
+      (packages/cli/src/sync-check.ts, extends felix's prototype) runs inline
       after every successful approve bridge and rollback (function call, not a
       watcher; `--no-sync` opts out) and manually via
       `uberprompt sync-check <prompt[.fragment]>` (alias `sync`). Dependents =
@@ -98,7 +98,7 @@ branches listed in IDEA.md instead of rewriting.
     tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
     evidence in `docs/PIPELINE-TEST.md`.
   - Stage 3→4 seam (details + measurements in PIPELINE-TEST.md): felix's graph
-    functions (`buildGraph`/`dependentsOf`, packages/cli/src/graph.mjs) are pure
+    functions (`buildGraph`/`dependentsOf`, packages/cli/src/graph.ts) are pure
     over `{prompts, edges}` — new `uberprompt sync-check <prompt>` feeds them
     from Mongo via a thin adapter, diffs current vs latest `prompt_versions`
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.

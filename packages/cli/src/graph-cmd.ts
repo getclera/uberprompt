@@ -1,16 +1,17 @@
 // `uberprompt graph [node] [--json] [--no-color]`
 // Without a node: render every prompt as a dependency tree (forward edges).
 // With a node: render the impact tree — everything affected when it changes.
-import { loadModel, refNodeId } from "./load.mjs";
-import { buildGraph, dependentsOf } from "./graph.mjs";
+import { loadModel, refNodeId } from "./load.ts";
+import { buildGraph, dependentsOf } from "./graph.ts";
 import {
   renderPromptForest,
   renderImpactTree,
   colorsEnabled,
-} from "./render.mjs";
-import { renderMap } from "./map.mjs";
+} from "./render.ts";
+import { renderMap } from "./map.ts";
+import type { CliOpts, Model } from "./types.ts";
 
-function knownNodes(model) {
+function knownNodes(model: Model): Set<string> {
   const nodes = new Set([...model.fragments.keys(), ...model.prompts.keys()]);
   for (const prompt of model.prompts.values()) {
     for (const frag of prompt.fragments || []) {
@@ -24,7 +25,7 @@ function knownNodes(model) {
   return nodes;
 }
 
-export function runGraph(dir, opts) {
+export function runGraph(dir: string, opts: CliOpts): number {
   const model = loadModel(dir);
   const graph = buildGraph(model);
   const focus = opts._[1];

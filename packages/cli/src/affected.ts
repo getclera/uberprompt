@@ -3,10 +3,16 @@
 // affected dependents of each changed node. Informational — always exits 0.
 import { execFileSync } from "node:child_process";
 import { relative, join } from "node:path";
-import { loadModel } from "./load.mjs";
-import { buildGraph, dependentsOf } from "./graph.mjs";
+import { loadModel } from "./load.ts";
+import { buildGraph, dependentsOf } from "./graph.ts";
+import type { CliOpts, Fragment, Model, PromptDoc } from "./types.ts";
 
-function git(repoRoot, args) {
+interface ChangedNode {
+  node: string;
+  reason: string;
+}
+
+function git(repoRoot: string, args: string[]): string {
   try {
     return execFileSync("git", args, {
       cwd: repoRoot,
@@ -18,7 +24,7 @@ function git(repoRoot, args) {
   }
 }
 
-function changedFiles(repoRoot, base, staged) {
+function changedFiles(repoRoot: string, base: string, staged: boolean): string[] {
   const args = ["diff", "--name-only"];
   if (staged) args.push("--cached");
   else args.push(base);
@@ -27,29 +33,34 @@ function changedFiles(repoRoot, base, staged) {
 }
 
 // Parse an old version of a file from git; null if missing/unparseable.
-function oldDoc(repoRoot, ref, relPath) {
+function oldDoc(repoRoot: string, ref: string, relPath: string): PromptDoc | null {
   const out = git(repoRoot, ["show", `${ref}:${relPath}`]);
   if (!out) return null;
   try {
-    return JSON.parse(out);
+    return JSON.parse(out) as PromptDoc;
   } catch {
     return null;
   }
 }
 
 // Which changed graph nodes does this run touch?
-export function changedNodes(model, repoRoot, base, staged) {
+export function changedNodes(
+  model: Model,
+  repoRoot: string,
+  base: string,
+  staged: boolean
+): ChangedNode[] {
   const files = changedFiles(repoRoot, base, staged);
   const showRef = staged ? "HEAD" : base;
-  const nodes = []; // { node, reason }
+  const nodes: ChangedNode[] = [];
 
   for (const file of files) {
     const rel = relative(model.dir, join(repoRoot, file));
     if (rel.startsWith("..")) continue; // outside the demo dir
 
     const parts = rel.split("/");
-    if (parts.length !== 2 || !parts[1].endsWith(".json")) continue;
-    const key = parts[1].replace(/\.json$/, "");
+    if (parts.length !== 2 || !parts[1]!.endsWith(".json")) continue;
+    const key = parts[1]!.replace(/\.json$/, "");
 
     if (parts[0] === "fragments") {
       nodes.push({ node: key, reason: "shared fragment text changed" });
@@ -62,7 +73,7 @@ export function changedNodes(model, repoRoot, base, staged) {
         continue;
       }
       const beforeText = new Map(
-        (before.fragments || []).map((f) => [f.key, f.text || ""])
+        (before.fragments || []).map((f: Fragment) => [f.key, f.text || ""])
       );
       let anyLocal = false;
       for (const f of prompt.fragments || []) {
@@ -82,7 +93,7 @@ export function changedNodes(model, repoRoot, base, staged) {
   return nodes;
 }
 
-export function runAffected(dir, repoRoot, opts) {
+export function runAffected(dir: string, repoRoot: string, opts: CliOpts): number {
   const base = opts.base || "HEAD";
   const staged = !!opts.staged;
   const model = loadModel(dir);
