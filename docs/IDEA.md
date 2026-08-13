@@ -200,7 +200,10 @@ Database `uberprompt`, collections:
               cacheReadInputTokens?, cacheCreationInputTokens? } },
   prompt?: { name, version, versionId: ObjectId, contentHash },
   input?: unknown, output?: string,  // promoted at normalize time, see note below
-  attributes: object,        // raw OTel attrs, dotted keys verbatim
+  attributes: object,        // raw OTel attrs; dots in keys escaped to __ so that a
+                             // wildcard index can cover them and Mongo does not read a
+                             // key like "gen_ai.request.model" as a nested path. Typed
+                             // promotion above reads the original keys before escaping.
   resource: object, ingestedAt: Date }
 
 // traces — rollup, one per root operation span. Derived from `spans` by an

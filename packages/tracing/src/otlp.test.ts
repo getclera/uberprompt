@@ -87,7 +87,8 @@ describe("decodeOtlpTraces", () => {
 
     it("decodes int values encoded as strings", () => {
       const doc = withAttrs([{ key: "gen_ai.usage.input_tokens", value: { intValue: "2048" } }]);
-      assert.equal(doc?.attributes["gen_ai.usage.input_tokens"], 2048);
+      assert.equal(doc?.attributes.gen_ai__usage__input_tokens, 2048);
+      assert.equal(doc?.genAi?.usage?.inputTokens, 2048);
     });
 
     // Falsy values are real data — dropping them silently corrupts the span.
