@@ -1,7 +1,10 @@
 import { defineConfig } from "vitepress";
 
+const BRAND_NAME = "überPrompt";
+const BRAND_HTML = '<span class="u-pink">über</span>Prompt';
+
 export default defineConfig({
-  title: "üBerprompt",
+  title: BRAND_NAME,
   description:
     "Prompt dependency graph & semantic sync for production AI systems",
   head: [
@@ -13,6 +16,10 @@ export default defineConfig({
       },
     ],
   ],
+  transformPageData(pageData) {
+    pageData.frontmatter.brand = BRAND_NAME;
+    pageData.frontmatter.brandHtml = BRAND_HTML;
+  },
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
