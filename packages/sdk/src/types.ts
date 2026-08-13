@@ -48,6 +48,9 @@ export interface EdgeDoc {
   to: EdgeEndpoint;
   kind: "uses" | "semantic";
   note?: string;
+  confidence?: number;
+  model?: string;
+  inferredAt?: Date;
 }
 
 export interface TokenUsage {
