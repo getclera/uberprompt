@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { closeDb, lessonsCol, loadPrompt, type EvalCase } from "@uberprompt/sdk";
+import { registerUberprompt } from "@uberprompt/tracing";
 import { findCulprit } from "./diagnose";
 import { collectCases, runEval } from "./evals";
 import { authorCandidate } from "./author";
@@ -98,9 +99,14 @@ async function main(): Promise<void> {
   else usage();
 }
 
+const tracing = registerUberprompt({ service: "uberprompt-agent" });
+
 main()
   .catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   })
-  .finally(closeDb);
+  .finally(async () => {
+    await tracing.shutdown();
+    await closeDb();
+  });
