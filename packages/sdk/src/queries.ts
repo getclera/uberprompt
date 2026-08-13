@@ -1,4 +1,4 @@
-import type { ChangeStreamOptions, ClientSession, Document } from "mongodb";
+import type { ChangeStreamDocument, ChangeStreamOptions, ClientSession, Document } from "mongodb";
 import { edgesCol, evalRunsCol, getClient, getDb, lessonsCol, promptsCol, syncStateCol, tracesCol } from "./db";
 import { embed } from "./embeddings";
 import type { EdgeDoc, EdgeEndpoint, LessonDoc } from "./types";
@@ -411,6 +411,16 @@ export async function saveResumeToken(watcherName: string, token: unknown): Prom
   );
 }
 
+export function createSerialChangeHandler<T>(
+  handle: (change: T) => Promise<void>,
+  onError: (error: unknown) => void,
+): (change: T) => void {
+  let chain: Promise<void> = Promise.resolve();
+  return (change: T) => {
+    chain = chain.then(() => handle(change)).catch(onError);
+  };
+}
+
 export async function watchLessonsResumable(
   watcherName: string,
   onLesson: (lesson: LessonDoc) => void | Promise<void>,
@@ -420,15 +430,19 @@ export async function watchLessonsResumable(
     fullDocument: "updateLookup",
     ...(token !== undefined ? { startAfter: token } : {}),
   };
-  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, opts);
-  stream.on("change", (change) => {
-    if (change.operationType === "insert" && change.fullDocument) {
-      void (async () => {
+  const stream = lessonsCol().watch<LessonDoc>(LESSONS_WATCH_PIPELINE, opts);
+  const handler = createSerialChangeHandler<ChangeStreamDocument<LessonDoc>>(
+    async (change) => {
+      if (change.operationType === "insert" && change.fullDocument) {
         await onLesson(change.fullDocument);
         await saveResumeToken(watcherName, change._id);
-      })();
-    }
-  });
+      }
+    },
+    (error) => {
+      console.error(`[watchLessonsResumable:${watcherName}] change handler failed`, error);
+    },
+  );
+  stream.on("change", handler);
   return {
     resumeToken: () => stream.resumeToken,
     close: () => stream.close(),

@@ -15,6 +15,7 @@ import {
   buildLiteralMatchesPipeline,
   buildRelatedFragmentsPipeline,
   buildSimilarFragmentsPipeline,
+  createSerialChangeHandler,
   flattenDependentsRows,
   parseServerVersion,
   supportsRankFusion,
@@ -226,6 +227,42 @@ test("validators enforce the IDEA.md contract shapes", () => {
   for (const field of ["proposalId", "attempt", "summary", "ts"]) {
     assert.ok(evalRuns.required.includes(field), `eval_runs requires ${field}`);
   }
+});
+
+test("createSerialChangeHandler runs handlers strictly in change order", async () => {
+  const completions: number[] = [];
+  const delays = [30, 5, 15];
+  const handle = (n: number) =>
+    new Promise<void>((resolve) => {
+      setTimeout(() => {
+        completions.push(n);
+        resolve();
+      }, delays[n]);
+    });
+  const errors: unknown[] = [];
+  const handler = createSerialChangeHandler(handle, (error) => errors.push(error));
+  handler(0);
+  handler(1);
+  handler(2);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(completions, [0, 1, 2]);
+  assert.deepEqual(errors, []);
+});
+
+test("createSerialChangeHandler isolates a rejection and keeps processing later changes", async () => {
+  const seen: number[] = [];
+  const errors: unknown[] = [];
+  const handler = createSerialChangeHandler<number>(async (n) => {
+    if (n === 1) throw new Error(`boom ${n}`);
+    seen.push(n);
+  }, (error) => errors.push(error));
+  handler(0);
+  handler(1);
+  handler(2);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(seen, [0, 2]);
+  assert.equal(errors.length, 1);
+  assert.match((errors[0] as Error).message, /boom 1/);
 });
 
 test("lessons change stream filters inserts and threads the resume token", () => {

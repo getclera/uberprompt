@@ -60,6 +60,12 @@ branches listed in IDEA.md instead of rewriting.
         replayed insert event (crash / resume-token regression) can't file duplicate
         LLM-driven proposals for a completed lesson. Manual `suggest` CLI passes
         `force` to re-run deliberately. Backlog path already filtered `processedAt`.
+  - [x] (felix/claude) Fixed race in `watchLessonsResumable`: change events were handled
+        concurrently and un-awaited, so a slow earlier lesson could save its older resume
+        token after a faster later one (token regression → replay on restart) and any
+        rejection was an unhandled crash. Now serialized via `createSerialChangeHandler`
+        (promise-chain, one lesson + token save completes before the next), token advances
+        strictly in change order, errors logged loudly instead of crashing.
   - [x] (shlok) Eval gate correctness: golden-only prompts can pass (a replay-less
         target used to fail unconditionally), judge failures count as ties instead of
         losses, baseline outputs are reused across retry attempts, and the win delta
