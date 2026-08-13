@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     COLLECTIONS.prompts,
     vectorIndex("fragments.embedding", FRAGMENTS_VECTOR_INDEX_NAME, ["name"]),
   );
-  await createSearchIndex(COLLECTIONS.lessons, vectorIndex("embedding", "lessons_embedding"));
+  await createSearchIndex(COLLECTIONS.lessons, vectorIndex("embedding", "lessons_embedding", ["status", "appliesTo"]));
   await createSearchIndex(
     COLLECTIONS.prompts,
     vectorIndex("descriptionEmbedding", "descriptions_embedding"),
