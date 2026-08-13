@@ -12,10 +12,12 @@
 One command, from the repo root:
 
 ```sh
-npm i -g ./packages/cli
+cd packages/cli && npm link
 ```
 
-That puts `uberprompt` on your PATH (installs its one dependency too). Then:
+That symlinks `uberprompt` onto your PATH (and installs its one dependency).
+Because it is a symlink into your checkout, every `git pull` updates the CLI
+automatically — no reinstall. Then:
 
 ```sh
 uberprompt graph                          # dependency graph
@@ -24,8 +26,8 @@ uberprompt affected                       # impact of your uncommitted changes
 uberprompt infer --apply                  # discover undeclared semantic edges (needs ANTHROPIC_API_KEY)
 ```
 
-Run it from anywhere inside the repo (it finds `apps/demo` via git). Hacking on
-the CLI itself? Use `cd packages/cli && npm link` instead — that symlinks, so
-your edits apply live.
+Run it from anywhere inside the repo (it finds `apps/demo` via git). If a later
+pull adds a new dependency to `packages/cli/package.json`, run `npm install`
+there once. Prefer a fixed copy instead of the live symlink? `npm i -g ./packages/cli`.
 
 Details + examples: `packages/cli/README.md`.
