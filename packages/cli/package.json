@@ -1,0 +1,12 @@
+{
+  "name": "@uberprompt/cli",
+  "version": "0.1.0",
+  "description": "uberprompt — dependency graph + semantic-sync CLI for prompt fragments",
+  "type": "module",
+  "bin": {
+    "uberprompt": "./bin/uberprompt.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0"
+  }
+}
