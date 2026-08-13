@@ -9,9 +9,9 @@
     "apply": "tsx src/apply/cli.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.116.0",
     "@uberprompt/sdk": "workspace:*",
-    "mongodb": "^6.18.0"
+    "mongodb": "^6.18.0",
+    "openai": "^6.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

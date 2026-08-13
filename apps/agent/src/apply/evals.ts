@@ -8,7 +8,7 @@ import {
   type PromptDoc,
   type Rubric,
 } from "@uberprompt/sdk";
-import { GENERATION_MODEL, REASONING_MODEL, generate } from "../claude";
+import { GENERATION_MODEL, REASONING_MODEL, generate } from "../llm";
 import { scoreCase } from "./judge";
 import { composeInput, fillInputs, withFragment, withOpenSlots } from "./render";
 import {

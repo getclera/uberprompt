@@ -1,4 +1,4 @@
-import { callJson } from "../claude";
+import { callJson } from "../llm";
 import type { Candidate, Culprit } from "./types";
 
 const MAX_EXAMPLES = 3;

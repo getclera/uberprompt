@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import { edgesCol, tracesCol, type LessonDoc, type PromptDoc, type TraceDoc } from "@uberprompt/sdk";
-import { callJson } from "../claude";
+import { callJson } from "../llm";
 import type { Culprit } from "./types";
 
 const MAX_EXAMPLES = 3;

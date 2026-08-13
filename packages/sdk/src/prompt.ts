@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { edgesCol, promptsCol, promptVersionsCol } from "./db";
 import { embed, embedMany } from "./embeddings";
 import type { EdgeEndpoint, PromptDoc, PromptFragment } from "./types";
 
-export const DESCRIPTION_MODEL = "claude-opus-5";
+export const DESCRIPTION_MODEL = process.env.OPENAI_REASONING_MODEL ?? "gpt-5.1";
 
 export interface UsesEdge extends EdgeEndpoint {
   note?: string;
@@ -18,11 +18,14 @@ export interface DefinePromptArgs {
   updatedBy?: string;
 }
 
-let anthropic: Anthropic | undefined;
+let openai: OpenAI | undefined;
 
-function getAnthropic(): Anthropic {
-  if (!anthropic) anthropic = new Anthropic();
-  return anthropic;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set");
+    openai = new OpenAI();
+  }
+  return openai;
 }
 
 async function generateDescription(
@@ -34,9 +37,8 @@ async function generateDescription(
     .filter((f) => f.text.length > 0)
     .map((f) => `[${f.key}]\n${f.text}`)
     .join("\n\n");
-  const response = await getAnthropic().messages.create({
+  const response = await getOpenAI().chat.completions.create({
     model: DESCRIPTION_MODEL,
-    max_tokens: 2000,
     messages: [
       {
         role: "user",
@@ -44,11 +46,11 @@ async function generateDescription(
       },
     ],
   });
-  const block = response.content.find((b) => b.type === "text");
-  if (!block || block.type !== "text") {
-    throw new Error(`Claude returned no text block for description of "${name}"`);
+  const content = response.choices[0]?.message.content;
+  if (!content) {
+    throw new Error(`${DESCRIPTION_MODEL} returned no description for "${name}"`);
   }
-  return block.text.trim();
+  return content.trim();
 }
 
 function fragmentsChanged(a: PromptFragment[], b: PromptFragment[]): boolean {

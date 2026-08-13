@@ -1,5 +1,5 @@
 import type { EvalCase } from "@uberprompt/sdk";
-import { callJson } from "../claude";
+import { callJson } from "../llm";
 import {
   RUBRIC_AXES,
   rubricTotal,
