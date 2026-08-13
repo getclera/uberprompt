@@ -26,10 +26,12 @@ An agent consumes trace batches and mines what's going wrong / recurring. Output
 **lessons** — durable, embedded memory entries, vector-deduped against existing
 lessons. Lessons are knowledge, not yet action.
 
-### 3. Apply to prompts (owner: talwe)
+### 3. Apply to prompts (owner: shlok)
 Lessons (or a human edit in the dashboard) become concrete changes:
 proposal → approval → new prompt version. The only stage that mutates prompts;
 every mutation is versioned (bump + snapshot + re-embed changed fragments).
+**Stage 3 itself never writes to `prompts`** — it emits evidence-backed proposals;
+the version bump happens on approval.
 
 **Targeting ladder** — where does a lesson belong? (in order, no RAG needed today):
 1. **Lineage**: the prompt(s) whose traces produced the lesson (`lesson.appliesTo`).
@@ -40,6 +42,21 @@ every mutation is versioned (bump + snapshot + re-embed changed fragments).
 3. **RAG**: vector search of the lesson embedding over embedded *purpose
    descriptions* (`descriptions_embedding`), not literal prompt text — decided
    IN scope, it's cheap.
+4. **Culprit**: within each targeted prompt, which *fragment* is at fault and which
+   exact *span* of its text causes the failure. Rungs 1–3 answer "which prompts";
+   this answers "which words". The span is quoted verbatim and validated as a real
+   substring, so the proposal can point at the bad actor rather than just describe
+   it. The culprit fragment may be shared, so its blast radius (other prompts using
+   it, via `edges`) is recorded alongside.
+
+**Eval gate.** A proposal is only surfaced if its candidate text is measurably
+better than what it replaces. Each candidate is scored against the live fragment on
+(a) replayed inputs from the failing traces that produced the lesson and (b) a
+curated golden set per prompt, both judged pairwise by an LLM on a fixed rubric.
+Hard gate: zero golden regressions, no replay losses, at least half the replay
+cases won. A failing candidate gets one revision attempt with the judge's critique
+fed back; if it fails again the proposal is stored `rejected` with its eval report
+and never surfaced. Evals are headless — the scorecard rides on the proposal.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
@@ -136,8 +153,29 @@ Database `uberprompt`, collections:
 { _id, target: { prompt: string, fragment?: string },
   oldText: string, newText: string, reason: string,
   source: { type: "lesson" | "sync-check" | "human-edit", ref?: ObjectId },
-  status: "pending" | "applied" | "rejected", ts: Date }
+  status: "evaluating" | "pending" | "applied" | "rejected", ts: Date,
+  culprit?: { fragment: string, span: string,      // span is verbatim from oldText
+              traceIds: ObjectId[], sharedWith: string[] },
+  evals?: { runIds: ObjectId[], passed: boolean,
+            baselineAvg: number, candidateAvg: number } }
+
+// eval_runs — one doc per (proposal, attempt); the evidence behind a proposal
+{ _id, proposalId: ObjectId, lessonId: ObjectId | null,
+  target: { prompt: string, fragment: string }, attempt: number,
+  candidateText: string,
+  cases: [{ caseId: string, kind: "replay" | "golden",
+            input: object, baselineOutput: string, candidateOutput: string,
+            baseline: Rubric, candidate: Rubric,   // Rubric = 4 axes, 1-5 each
+            delta: number, verdict: "win" | "tie" | "loss", critique: string }],
+  summary: { replayWins: number, replayLosses: number, goldenRegressions: number,
+             baselineAvg: number, candidateAvg: number, passed: boolean },
+  judgeModel: string, genModel: string, ts: Date }
 ```
+
+`proposals.status` gains `"evaluating"` (candidate under eval, not yet surfaced).
+`"pending"` keeps its meaning — passed the gate, awaiting human approval — so the
+dashboard inbox query is unchanged. Eval generations are **never** written to
+`traces`: stage 2 would otherwise learn from stage 3's own eval output.
 
 Vector Search indexes (Voyage, cosine): `fragments_embedding` on
 `prompts.fragments.embedding`, `lessons_embedding` on `lessons.embedding`,
@@ -216,6 +254,8 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
 
 - Stage 2 → 3: the `lessons` collection IS the interface — stage 2 inserts,
   stage 3 consumes new lessons and stamps `processedAt` after filing proposals.
+  `processedAt` is stamped whether the eval gate passed or rejected — a lesson is
+  processed once, and the outcome lives on its proposals.
 - Stage 3 targeting tier 3 (RAG): $vectorSearch lesson.embedding against
   `descriptions_embedding` (function-level match, not literal text).
 - Dependency interface (fragment-level, used by stage 4):
@@ -240,6 +280,9 @@ Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
   must discover (e.g. triage-router routing-rules ↔ escalation-criteria;
   escalation-writer context ↔ refund-policy).
 - `apps/demo/traces.seed.json` — seed traces (incl. the seeded failures).
+- `apps/demo/golden/<prompt-name>.json` — `[{ id, input, intent }]`; the eval gate's
+  regression set for that prompt. Lives in-repo next to the prompt it protects, not
+  in Mongo: a golden case and the fragment it guards change together.
 
 File-first tooling: `packages/cli` ships the **`uberprompt` CLI** — `infer`
 (`gpt-5-nano` infers semantic edges from fragment texts → edges.json), `affected`
@@ -267,6 +310,10 @@ A local fragment with empty `text` is a **runtime input slot** (`{{ticket}}`,
 
 No auth, single tenant, no playground, no eval UI, no OTel. Agent runs as a plain
 Node loop; polling fallback if change streams fight us.
+
+("No eval UI" still holds — the stage-3 eval gate is headless. It writes `eval_runs`
+and a summary on the proposal; the dashboard renders that scorecard inside the
+existing proposal inbox rather than getting its own eval surface.)
 
 ## Salvage branches (from the pre-alignment build — reuse, don't rewrite)
 
