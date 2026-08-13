@@ -63,3 +63,4 @@ pnpm --filter @uberprompt/cli exec uberprompt tail
 - [graph](/cli/graph) to visualize the dependency graph
 - [affected](/cli/affected) to see what a change impacts
 - [infer](/cli/infer) to discover undeclared semantic edges
+- [Example run report](https://claude.ai/code/artifact/1220fb44-dbc2-4063-8f70-d0a05f670dda) showing the full pipeline end to end

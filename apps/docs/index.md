@@ -3,27 +3,27 @@ layout: home
 
 hero:
   name: "<span class=\"u-pink\">über</span>Prompt"
-  text: Prompt dependency graph & semantic sync
-  tagline: Trace, learn, apply, sync. One pipeline for production prompt management.
+  text: Persistent context for your system and team
+  tagline: Your agents share rules, policies, and voice. überPrompt keeps them all in sync when anything changes.
   actions:
     - theme: brand
       text: Get Started
       link: /guide/getting-started
     - theme: alt
-      text: CLI Reference
-      link: /cli/
+      text: Example Run Report
+      link: https://claude.ai/code/artifact/1220fb44-dbc2-4063-8f70-d0a05f670dda
 
 features:
-  - title: Trace Ingestion
-    details: OTLP spans from any language, via the SDK or the standalone collector. Every LLM call lands in MongoDB as a span and rolls up into a trace.
-    link: /cli/collect
-    linkText: See collect →
-  - title: Dependency Graph
-    details: Declared and semantic edges between prompts and shared fragments. See what depends on what, and what breaks when something changes.
+  - title: System-wide context
+    details: Not one agent's memory. The whole system's. Shared fragments, dependency graphs, and semantic edges keep every prompt aware of every other.
     link: /cli/graph
-    linkText: See graph →
-  - title: Semantic Sync
-    details: After a version bump, sync-check walks the graph and finds prompts that now contradict the change. It files a minimal rewrite for each one.
-    link: /cli/infer
-    linkText: See infer →
+    linkText: See the graph →
+  - title: Learns from production
+    details: Traces flow in, an agent mines patterns, and lessons become proposals. The loop from real usage back into your prompts closes itself.
+    link: /cli/collect
+    linkText: See tracing →
+  - title: Stays in sync automatically
+    details: Change one prompt and the dependency graph catches what breaks. Semantic edges find relationships nobody declared. The system heals itself.
+    link: /cli/sync-check
+    linkText: See sync-check →
 ---
