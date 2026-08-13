@@ -25,6 +25,9 @@ branches listed in IDEA.md instead of rewriting.
 - [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
 - [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
 - [x] (felix/claude) CLI graph visualization: `uberprompt graph [node]` map/tree/impact views + tests
+  - Evaluated external renderers for the map (beautiful-mermaid, diagonjs, d2, graph-easy):
+    all break down or spaghetti on our dense bipartite graph, or need a non-npm binary.
+    Decision: keep the custom renderer; readability via two-sided barycenter ordering.
 
 ## The four main tasks
 - [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
