@@ -8,6 +8,7 @@ import {
   renderImpactTree,
   colorsEnabled,
 } from "./render.mjs";
+import { renderMap } from "./map.mjs";
 
 function knownNodes(model) {
   const nodes = new Set([...model.fragments.keys(), ...model.prompts.keys()]);
@@ -57,13 +58,18 @@ export function runGraph(dir, opts) {
     return 0;
   }
 
-  const declared = model.edges.filter((e) => e.kind === "uses").length;
-  const semantic = model.edges.filter((e) => e.kind === "semantic").length;
-  console.log(
-    `Prompt dependency graph — ${model.prompts.size} prompts, ` +
-      `${model.fragments.size} shared fragments ` +
-      `(${declared} uses, ${semantic} semantic)\n`
-  );
-  console.log(renderPromptForest(model, { colors }));
+  if (opts.tree) {
+    const declared = model.edges.filter((e) => e.kind === "uses").length;
+    const semantic = model.edges.filter((e) => e.kind === "semantic").length;
+    console.log(
+      `Prompt dependency graph — ${model.prompts.size} prompts, ` +
+        `${model.fragments.size} shared fragments ` +
+        `(${declared} uses, ${semantic} semantic)\n`
+    );
+    console.log(renderPromptForest(model, { colors }));
+    return 0;
+  }
+
+  console.log(renderMap(model, { colors }));
   return 0;
 }

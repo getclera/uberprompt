@@ -50,8 +50,12 @@ Usage:
   uberprompt <command> [--dir <demo-dir>] [options]
 
 Commands:
-  graph                 Print each shared fragment with its dependents.
-                          --json
+  graph [node]          Render the dependency graph. Without a node: 2D map —
+                        prompts left, shared fragments right, colored buses
+                        between (● = junction where a line crosses its own bus).
+                        With a node: the impact tree of that node.
+                          --tree   per-prompt dependency trees instead of the map
+                          --json --no-color
   affected [<node>]     With <node> (a prompt, shared fragment, or
                         prompt.fragment): show what depends on it and what it
                         depends on, with backing files.

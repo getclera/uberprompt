@@ -14,9 +14,16 @@ function run(args) {
   });
 }
 
-test("graph renders the demo prompt forest", () => {
+test("graph renders the demo map by default", () => {
   const out = run(["graph"]);
   assert.match(out, /Prompt dependency graph — 5 prompts, 4 shared fragments/);
+  assert.match(out, /^billing-agent ╶/m);
+  assert.match(out, /▶ output-format/);
+  assert.match(out, /▶ brand-voice/);
+});
+
+test("graph --tree renders the prompt forest", () => {
+  const out = run(["graph", "--tree"]);
   assert.match(out, /^billing-agent$/m);
   assert.match(out, /├── brand-voice \[uses\]/);
   assert.match(out, /└── output-format \[uses\]/);
