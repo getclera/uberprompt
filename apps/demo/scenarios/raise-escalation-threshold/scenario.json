@@ -1,0 +1,32 @@
+{
+  "name": "raise-escalation-threshold",
+  "description": "Raise the churn-risk escalation threshold from $5,000 to $10,000 ARR in the canonical escalation-criteria fragment. The declared graph only reaches escalation-writer; triage-router paraphrases the old threshold in its local routing-rules fragment and silently keeps routing on $5k — the sync agent must infer that edge and propose the fix.",
+  "steps": [
+    {
+      "file": "apps/demo/fragments/escalation-criteria.json",
+      "field": "text",
+      "find": "churn risk on an account worth more than $5,000 ARR",
+      "replace": "churn risk on an account worth more than $10,000 ARR",
+      "bumpVersion": true
+    }
+  ],
+  "expected": {
+    "declaredAffected": [
+      { "prompt": "escalation-writer", "via": { "kind": "uses", "fragment": "escalation-criteria" } }
+    ],
+    "inferenceMustFind": [
+      {
+        "prompt": "triage-router",
+        "fragment": "routing-rules",
+        "kind": "semantic",
+        "contradiction": "routing-rules still says 'roughly $5k+ in yearly spend'; canonical criteria now says $10,000 ARR",
+        "stalePhrase": "roughly $5k+ in yearly spend"
+      }
+    ],
+    "demo": {
+      "ticket": "ticket.json",
+      "before": "triage-router routes the $7k churn ticket to escalation (old $5k rule)",
+      "after": "once the inferred proposal for routing-rules is approved, triage-router routes the same ticket to billing — $7k is below the new $10k threshold"
+    }
+  }
+}
