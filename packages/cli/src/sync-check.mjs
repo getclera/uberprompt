@@ -25,6 +25,7 @@ const CONSISTENCY_TOOL = {
     "Judge whether a dependent prompt fragment still agrees with the new text of a fragment that just changed. If they now contradict each other, return the minimal rewrite of the dependent fragment that restores consistency.",
   parameters: {
     type: "object",
+    additionalProperties: false,
     properties: {
       consistent: { type: "boolean" },
       reason: { type: "string" },
