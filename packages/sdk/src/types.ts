@@ -25,6 +25,7 @@ export interface PromptDoc {
   descriptionEmbedding?: number[];
   fragments: PromptFragment[];
   template: string;
+  contentHash?: string;
   updatedAt: Date;
   updatedBy: string;
 }
