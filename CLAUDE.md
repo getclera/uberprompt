@@ -96,3 +96,14 @@ adaptive thinking (default — don't pass a `thinking` config or sampling params
 - **No silent PASS.** Before claiming something works, show the command you ran and
   its real output (typecheck, script run, curl). "It should work" doesn't count.
 - Rebase `origin/main` before every push.
+
+## Debugging discipline (ported from clera-platform)
+
+- **Evidence before root cause.** A hypothesis needs DB/code/log proof before
+  being voiced — never assume data differences or timing explain a bug.
+- **Never blame cache.** "Stale cache" is not a root cause; trace the code path.
+- **Never blame deployment.** 95% of the time it's a code bug — deployment-state
+  theories require direct evidence before being voiced.
+- **Format only files you edited** — never run a repo-wide formatter. If a
+  formatter widens your diff beyond what you touched, `git checkout --` those
+  files before committing.
