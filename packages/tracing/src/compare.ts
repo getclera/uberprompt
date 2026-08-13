@@ -9,6 +9,7 @@ export interface VersionStats {
   errorRate: number;
   avgScore?: number;
   avgLatencyMs: number;
+  model?: string;
   avgInputTokens?: number;
   avgOutputTokens?: number;
   firstSeen: Date;
@@ -39,6 +40,7 @@ function statsPipeline(promptName?: string): Document[] {
         errors: { $sum: { $cond: [{ $ifNull: ["$error", false] }, 1, 0] } },
         avgScore: { $avg: "$score" },
         avgLatencyMs: { $avg: "$meta.latencyMs" },
+        model: { $first: "$meta.model" },
         avgInputTokens: { $avg: "$meta.tokens.inputTokens" },
         avgOutputTokens: { $avg: "$meta.tokens.outputTokens" },
         firstSeen: { $min: "$ts" },
@@ -63,6 +65,7 @@ function statsPipeline(promptName?: string): Document[] {
         errorRate: { $divide: ["$errors", "$traces"] },
         avgScore: 1,
         avgLatencyMs: { $round: ["$avgLatencyMs", 0] },
+        model: 1,
         avgInputTokens: { $round: ["$avgInputTokens", 0] },
         avgOutputTokens: { $round: ["$avgOutputTokens", 0] },
         firstSeen: 1,
@@ -74,10 +77,15 @@ function statsPipeline(promptName?: string): Document[] {
   ];
 }
 
+// Mongo's $avg returns null for fields absent from every document; normalize those to
+// undefined at the boundary so downstream code can rely on a single absent-value shape.
 export async function versionStats(promptName?: string): Promise<VersionStats[]> {
   return (await tracesCol().aggregate<VersionStats>(statsPipeline(promptName)).toArray()).map((row) => ({
     ...row,
     avgScore: row.avgScore ?? undefined,
+    model: row.model ?? undefined,
+    avgInputTokens: row.avgInputTokens ?? undefined,
+    avgOutputTokens: row.avgOutputTokens ?? undefined,
   }));
 }
 
