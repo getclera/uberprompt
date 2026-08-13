@@ -93,7 +93,22 @@
 }
 
 .VPNavBarTitle .title {
-  display: none !important;
+  font-size: 0 !important;
+  font-family: var(--up-mono);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.VPNavBarTitle .title::before {
+  content: "über";
+  font-size: 16px;
+  color: var(--up-accent);
+}
+
+.VPNavBarTitle .title::after {
+  content: "Prompt";
+  font-size: 16px;
+  color: var(--vp-c-text-1);
 }
 
 .VPHero .text {
