@@ -8,7 +8,7 @@ List pending proposals with a compact old-to-new diff.
 uberprompt proposals [--all]
 ```
 
-Displays all proposals with status `"pending"`, showing the target prompt and fragment, the reason for the change, and a compact inline diff of the old and new text.
+Lists proposals with status `"pending"`. Each entry shows the target prompt and fragment, the reason for the change, and an inline diff of the old and new text.
 
 ## Flags
 

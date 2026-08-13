@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `uberprompt` CLI provides file-first tooling for prompt dependency management, trace ingestion, and semantic edge inference.
+`uberprompt` is the command-line tool for the prompt dependency graph, trace ingestion, and the proposal workflow.
 
 ## Installation
 

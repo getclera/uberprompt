@@ -1,6 +1,6 @@
 # uberprompt propose
 
-Consume unprocessed lessons into pending proposals via the targeting ladder.
+Turn unprocessed lessons into pending proposals.
 
 ## Usage
 
@@ -8,13 +8,13 @@ Consume unprocessed lessons into pending proposals via the targeting ladder.
 uberprompt propose [--dry-run] [--model <m>]
 ```
 
-Reads lessons that have no `processedAt` timestamp and generates concrete prompt-change proposals. Each lesson is matched to target prompts using the three-rung targeting ladder:
+Reads lessons that have no `processedAt` timestamp and generates prompt-change proposals. Each lesson is matched to target prompts by the targeting ladder, in order:
 
-1. **Lineage** -- the prompt(s) whose traces produced the lesson (`lesson.appliesTo`)
-2. **Catalog reasoning** -- LLM reads the full prompt catalog and picks additional prompts the lesson applies to
-3. **RAG** -- vector search of the lesson embedding over prompt description embeddings
+1. **Lineage**: the prompts whose traces produced the lesson (`lesson.appliesTo`)
+2. **Catalog reasoning**: an LLM reads the full prompt catalog and picks other prompts the lesson applies to
+3. **RAG**: vector search of the lesson embedding against prompt description embeddings
 
-Proposals are written to the `proposals` collection with status `"pending"`. Identical pending proposals are skipped, and multiple proposals for the same prompt are grouped so that one approval produces one version bump.
+Proposals are written to the `proposals` collection with status `"pending"`. Identical pending proposals are skipped. Proposals for the same prompt are grouped, so one approval produces one version bump.
 
 ## Flags
 

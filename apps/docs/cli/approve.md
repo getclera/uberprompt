@@ -31,7 +31,7 @@ Approved: refund-checker v3 → v4
   embedding: updated (1024d)
 ```
 
-Typical workflow -- list then approve:
+Typical workflow, list then approve:
 
 ```bash
 uberprompt proposals

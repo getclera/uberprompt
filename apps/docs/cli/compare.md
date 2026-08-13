@@ -10,7 +10,7 @@ uberprompt compare [prompt]
 
 Without arguments, compares the two most recent versions of every prompt that has traces. With a `prompt` argument, shows the comparison for that prompt only.
 
-For each prompt version pair the output includes trace count, error rate, average score, p50/p95 latency, average token usage, and the delta between versions -- so you can tell at a glance whether a new version actually helped.
+For each version pair the output shows trace count, error rate, average score, p50/p95 latency, average token usage, and the delta between versions. The delta tells you whether the new version helped.
 
 ## Flags
 

@@ -1,6 +1,6 @@
 # uberprompt sync-check
 
-Diff the current prompt version against its latest snapshot, walk the dependency graph for dependents of changed fragments, LLM-check for contradictions, and file consistency proposals.
+Check the dependents of a changed prompt for contradictions. File a consistency proposal for each one found.
 
 ## Usage
 
@@ -8,14 +8,14 @@ Diff the current prompt version against its latest snapshot, walk the dependency
 uberprompt sync-check <prompt> [--against <p.f>] [--dry-run] [--model <m>]
 ```
 
-This is stage 4 of the pipeline -- semantic consistency enforcement. After a prompt version is bumped (by `approve`, a human edit, or a prior sync-check), this command ensures dependent prompts stay consistent:
+This is stage 4 of the pipeline. Run it after a version bump, whether from `approve`, a human edit, or a prior sync-check. It:
 
 1. Diffs the current prompt version against the latest `prompt_versions` snapshot to find changed fragments
 2. Walks `edges` (declared `uses` + discovered `semantic`) via `$graphLookup` to collect transitive dependents
 3. Runs vector search to discover undeclared semantic dependents and persists new `kind:"semantic"` edges
-4. LLM-checks each dependent fragment for contradiction with the change
-5. Files `"sync-check"` proposals for any contradictions found (minimal rewrite)
-6. Waves repeat, shrinking, until the graph is quiet
+4. Asks an LLM whether each dependent fragment contradicts the change
+5. Files a `"sync-check"` proposal (minimal rewrite) for each contradiction
+6. Repeats until a wave finds no new contradictions
 
 ## Flags
 
