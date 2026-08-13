@@ -42,12 +42,33 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
   `MONGODB_URI`, `MONGODB_DB`, `OPENAI_API_KEY`.
 - **`proposals [--all]`** — list pending (default) or all proposals with a
   compact word-level old→new diff.
-- **`approve <id>` / `reject <id>`** — approve snapshots the current prompt into
-  `prompt_versions` (with `contentHash`), applies `newText` to the target
+- **`approve <id>` / `reject <id>`** — approve snapshots the pre-change prompt
+  into `prompt_versions` (with `contentHash`), applies `newText` to the target
   fragment, bumps the version, re-embeds the fragment via Voyage
-  (`ai.mongodb.com`, voyage-3.5-lite), and marks the proposal `applied` — this
-  version bump is what triggers the stage-4 sync check. Reject just flips the
-  status. Approve also needs `VOYAGE_API_KEY`.
+  (`ai.mongodb.com`, voyage-3.5-lite), snapshots the post-change version too,
+  marks the proposal `applied`, and then runs the stage-4 sync check inline
+  (`--no-sync` skips it). Reject just flips the status. Approve also needs
+  `VOYAGE_API_KEY`.
+- **`sync <prompt[.fragment]> [--dry-run] [--model gpt-5.1]`** — stage 4,
+  manual run (approve/rollback trigger it automatically). Diffs the prompt's
+  current version against its latest `prompt_versions` snapshot, walks the
+  Mongo `edges` graph for declared + transitive dependents of each changed
+  fragment, discovers undeclared dependents via `$vectorSearch` over
+  `fragments_embedding` (cosine >= 0.80, top 5, same prompt excluded),
+  persists new `kind:"semantic"` edges (`confidence`, `model`, `inferredAt`),
+  LLM-checks every dependent fragment for contradiction, and files
+  `source: sync-check` proposals for real conflicts (identical pending dupes
+  skipped).
+- **`rollback <prompt> [--to <version>] [--dry-run]`** — restore a prompt from
+  a `prompt_versions` snapshot (default: previous version) as a NEW version:
+  history stays append-only. Snapshots the current state, restores fragments +
+  template, bumps the version, re-embeds changed fragments, snapshots the
+  result, then runs the sync check (`--no-sync` skips it).
+- **`reembed [--dry-run]`** — re-embed every stored vector (prompt fragment
+  embeddings, `descriptionEmbedding`s, lesson embeddings) through the current
+  Voyage endpoint, then verify known-good similarity pairs. Run this after an
+  embedding-space drift (vectors from different endpoint/model eras are
+  mutually orthogonal and silently break all vector search).
 - **`infer [--apply] [--threshold 0.7]`** — ask the model (`gpt-5-nano`) for
   undeclared **semantic** edges: fragments that restate/paraphrase/constrain the
   same rule such that editing one should trigger review of the other. Prints

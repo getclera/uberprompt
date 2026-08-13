@@ -49,11 +49,30 @@ branches listed in IDEA.md instead of rewriting.
       version bump + Voyage re-embed + status "applied". Verified end-to-end against
       live Atlas with a synthetic lesson (cleaned up after; billing-agent restored to v1).
   - Benched: culprit rung + eval gate (PR #8).
-- [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
+- [x] (talwe+claude — taken over from felix, done pending merge) 4 — Semantic
+      sync check: `runSyncCheck` (packages/cli/src/sync.mjs) runs inline at the
+      end of every approve/rollback (function call, not a watcher) and manually
+      via `uberprompt sync <prompt[.fragment]>`. Dependents = Mongo `edges`
+      graph walk (felix's buildGraph/dependentsOf over a thin adapter) ∪
+      `$vectorSearch` discovery (cosine >= 0.80, top 5) with new
+      `kind:"semantic"` edges persisted (confidence/model/inferredAt); gpt-5.1
+      consistency check files `source:"sync-check"` proposals for real
+      conflicts. Plus: `uberprompt reembed` (embedding-space backfill + verify),
+      approve now snapshots the post-change version too, and
+      `uberprompt rollback <prompt> [--to N]` restores a snapshot as a new
+      version (append-only) and fires the sync check.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
-- [ ] (talwe+claude — in progress) Wire end-to-end, dry-run the 4-min script in IDEA.md
+- [x] (talwe+claude — done) Wire end-to-end: LIVE convergence run recorded in
+      `docs/DEMO-RUN.md` (the on-stage script). Approved the pending
+      escalation-writer.context proposal → sync check discovered the
+      answer-key semantic edge context→refund-policy (0.848) → filed 1
+      consistency proposal → approved → wave 2 walked back through the new
+      edge, judged consistent, graph quiet. 2 waves to convergence; manual
+      `sync tech-support-agent` also run (surfaces routing-rules 0.849 +
+      escalation-criteria 0.832, all consistent). Operational loop taught to
+      any session via `.claude/skills/sync-loop/SKILL.md`.
   - Stage 3 verified live (Aug 13): approved proposal `6a7e40ee…` for real —
     tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
     evidence in `docs/PIPELINE-TEST.md`.
@@ -64,9 +83,7 @@ branches listed in IDEA.md instead of rewriting.
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
     Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
     the answer-key neighbors judged consistent — loop converges quiet in wave 1.
-  - Still open at the seam: IDEA.md handoff section still says change-stream
-    (update to the call shape; chain sync-check onto approve); all embeddings
-    written before ~21:41Z Aug 13 (6 prompts + lesson 1) are orthogonal to the
-    current endpoint's space — semantic-edge discovery returns noise until
-    re-embedded; apps/demo JSON diverged from Mongo after the apply (files
-    still v1).
+  - Seam items above all closed by the stage-4 PR: IDEA.md now states the
+    function-call handoff, `uberprompt reembed` repaired the split embedding
+    space (verified 0.849/0.832 known-good pairs), and apps/demo JSON is
+    officially seed-only (Mongo canonical — no write-back).
