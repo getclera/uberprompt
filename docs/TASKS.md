@@ -6,6 +6,19 @@ branches listed in IDEA.md instead of rewriting.
 
 ## Setup
 - [x] (talwe+claude) Atlas cluster `cluster0.u7elw1` up, db `uberprompt` + 6 collections + 3 vector indexes (fragments/descriptions/lessons, 1024d cosine) created; MONGODB_URI in .env; MongoDB MCP in .mcp.json (needs session restart + approve)
+  - Verified from a client (Aug 13): MongoDB 8.0.29, `ReplicaSetWithPrimary` (3 servers),
+    read/write confirmed, **change streams available** — so the IDEA.md event bus works.
+    Org: "SF .local Build Fest".
+  - The password contains a `!`, which must be percent-encoded as `%21` inside the URI —
+    otherwise auth fails with code 18 and looks like a wrong password.
+  - **Gotcha — disconnect your VPN.** With a VPN up, Atlas sees the tunnel's exit IP and
+    kills the connection during the TLS handshake: TCP to all 3 shards opens, handshake
+    returns 0 bytes, auth never runs. It looks exactly like a paused cluster or a bad
+    password, and is neither. Also add your current egress IP under Network Access
+    (`curl https://api.ipify.org`) — it changes when you switch networks.
+  - Still missing for stage 1: the `spans` collection, and a **unique index on
+    `traces.traceId`** (the `$merge` key — without it the rollup duplicates instead of
+    updating). Created by the stage 1 `init` subcommand.
 - [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
 - [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
@@ -13,7 +26,10 @@ branches listed in IDEA.md instead of rewriting.
 - [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
 
 ## The four main tasks
-- [ ] (unclaimed) 1 — Trace ingestion: SDK tracedCall + demo app generating traces
+- [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
+  - Contract in IDEA.md. Next: `packages/tracing` (normalize, rollup, exporter, register),
+    then `init` / `collect` / `tail` added as subcommands to the existing `packages/cli`,
+    then the demo app emitting real traces.
 - [ ] (unclaimed) 2 — Analyze/learn: trace batches → lessons (embedded, deduped)
 - [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
