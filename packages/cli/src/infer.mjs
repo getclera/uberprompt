@@ -7,14 +7,14 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadModel, nonEmptyFragments, refNodeId } from "./load.mjs";
 
-const MODEL = "claude-opus-5";
+const MODEL = "gpt-5-nano";
 
 function loadApiKey(repoRoot) {
-  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
   const envPath = join(repoRoot, ".env");
   if (existsSync(envPath)) {
     for (const line of readFileSync(envPath, "utf8").split("\n")) {
-      const m = line.match(/^\s*(?:export\s+)?ANTHROPIC_API_KEY\s*=\s*(.+)\s*$/);
+      const m = line.match(/^\s*(?:export\s+)?OPENAI_API_KEY\s*=\s*(.+)\s*$/);
       if (m) {
         let v = m[1].trim();
         if (
@@ -91,9 +91,9 @@ export async function runInfer(dir, repoRoot, opts) {
   const apiKey = loadApiKey(repoRoot);
   if (!apiKey) {
     console.error(
-      "error: ANTHROPIC_API_KEY is not set.\n" +
+      "error: OPENAI_API_KEY is not set.\n" +
         "  Set it in your environment or add it to a .env file at the repo root:\n" +
-        "    ANTHROPIC_API_KEY=sk-ant-...\n" +
+        "    OPENAI_API_KEY=sk-...\n" +
         "  `uberprompt infer` needs it to call the model."
     );
     return 1;
@@ -125,26 +125,43 @@ export async function runInfer(dir, repoRoot, opts) {
     "Fragments:\n" +
     listing;
 
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey });
+  const { default: OpenAI } = await import("openai");
+  const client = new OpenAI({ apiKey });
 
-  const resp = await client.messages.create({
+  const resp = await client.chat.completions.create({
     model: MODEL,
-    max_tokens: 4096,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: "report_semantic_edges" },
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: TOOL.name,
+          description: TOOL.description,
+          parameters: TOOL.input_schema,
+        },
+      },
+    ],
+    tool_choice: { type: "function", function: { name: TOOL.name } },
     messages: [{ role: "user", content: prompt }],
   });
 
-  const toolUse = resp.content.find(
-    (b) => b.type === "tool_use" && b.name === "report_semantic_edges"
+  const toolCall = (resp.choices[0]?.message?.tool_calls || []).find(
+    (c) => c.function?.name === TOOL.name
   );
-  const raw = toolUse ? toolUse.input.edges || [] : [];
+  const raw = toolCall
+    ? JSON.parse(toolCall.function.arguments).edges || []
+    : [];
 
   const usesPairs = usesPairKeys(model);
   const proposed = [];
   for (const e of raw) {
     if (!e.from || !e.to || !e.to.fragment) continue;
+    if (e.from.fragment && e.from.fragment.includes(".")) {
+      const dot = e.from.fragment.indexOf(".");
+      const head = e.from.fragment.slice(0, dot);
+      if (model.prompts.has(head)) {
+        e.from = { prompt: head, fragment: e.from.fragment.slice(dot + 1) };
+      }
+    }
     if (typeof e.confidence !== "number" || e.confidence < threshold) continue;
     // skip self
     if (e.from.fragment === e.to.fragment && !e.from.prompt) continue;

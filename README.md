@@ -21,7 +21,7 @@ That puts `uberprompt` on your PATH (installs its one dependency too). Then:
 uberprompt graph                          # dependency graph
 uberprompt affected escalation-criteria   # what depends on this / what it depends on
 uberprompt affected                       # impact of your uncommitted changes
-uberprompt infer --apply                  # discover undeclared semantic edges (needs ANTHROPIC_API_KEY)
+uberprompt infer --apply                  # discover undeclared semantic edges (needs OPENAI_API_KEY)
 ```
 
 Run it from anywhere inside the repo (it finds `apps/demo` via git). Hacking on

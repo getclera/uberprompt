@@ -1,7 +1,7 @@
 # `uberprompt` CLI
 
 Dependency graph + semantic-sync for prompt fragments. Zero-build plain Node ESM;
-the only dependency is `@anthropic-ai/sdk` (needed by `infer`).
+the only dependency is `openai` (needed by `infer`).
 
 ## Install
 
@@ -34,13 +34,13 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
   prompt/fragment files to graph nodes and report the affected dependents (with via-path + edge
   kind). Default compares the working tree against `HEAD`. Always exits 0.
   `--json` for machine output.
-- **`infer [--apply] [--threshold 0.7]`** — ask the model (`claude-opus-5`) for
+- **`infer [--apply] [--threshold 0.7]`** — ask the model (`gpt-5-nano`) for
   undeclared **semantic** edges: fragments that restate/paraphrase/constrain the
   same rule such that editing one should trigger review of the other. Prints
   proposals by default; `--apply` merges them into `edges.json` as `semantic`
   edges (`note`, `confidence`, `model`, `inferredAt`), never duplicating an
   existing edge and never touching declared `uses` edges. Needs
-  `ANTHROPIC_API_KEY` (env or a repo-root `.env`); exits 1 with a clear message
+  `OPENAI_API_KEY` (env or a repo-root `.env`); exits 1 with a clear message
   if unset.
 
 ## Example — the raise-escalation-threshold scenario
