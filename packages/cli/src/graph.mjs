@@ -14,13 +14,22 @@ import { refNodeId } from "./load.mjs";
 
 export function buildGraph(model) {
   // rev: toNode -> [{ from, kind, note, confidence }]  (things that depend on toNode)
+  // fwd: fromNode -> [{ to, kind, note, confidence }]  (things toNode depends on)
   const rev = new Map();
+  const fwd = new Map();
   for (const edge of model.edges) {
     const from = refNodeId(edge.from);
     const to = refNodeId(edge.to);
     if (!rev.has(to)) rev.set(to, []);
     rev.get(to).push({
       from,
+      kind: edge.kind,
+      note: edge.note,
+      confidence: edge.confidence,
+    });
+    if (!fwd.has(from)) fwd.set(from, []);
+    fwd.get(from).push({
+      to,
       kind: edge.kind,
       note: edge.note,
       confidence: edge.confidence,
@@ -37,7 +46,17 @@ export function buildGraph(model) {
     return promptNames.has(head) ? head : null;
   };
 
-  return { rev, promptNames, owningPrompt };
+  // prompt -> its local-fragment node ids (a prompt "contains" its fragments,
+  // so it depends on whatever they depend on).
+  const localFragments = new Map();
+  for (const [name, prompt] of model.prompts) {
+    localFragments.set(
+      name,
+      (prompt.fragments || []).map((f) => `${name}.${f.key}`)
+    );
+  }
+
+  return { rev, fwd, promptNames, owningPrompt, localFragments };
 }
 
 // All nodes affected when `start` changes. Returns ordered entries:
@@ -72,6 +91,46 @@ export function dependentsOf(graph, start) {
       const entry = { node: owner, kind: "contains", via: [...cur.via, owner] };
       result.push(entry);
       queue.push(entry);
+    }
+  }
+
+  return result;
+}
+
+// Everything `start` depends on (forward walk). Entering a prompt node also
+// descends into its local fragments ("contains"), so a prompt's dependencies
+// include what its local fragments semantically depend on.
+export function dependenciesOf(graph, start) {
+  const result = [];
+  const seen = new Set([start]);
+  const queue = [{ node: start, via: [start] }];
+
+  while (queue.length) {
+    const cur = queue.shift();
+
+    for (const dep of graph.fwd.get(cur.node) || []) {
+      if (seen.has(dep.to)) continue;
+      seen.add(dep.to);
+      const entry = {
+        node: dep.to,
+        kind: dep.kind,
+        note: dep.note,
+        confidence: dep.confidence,
+        via: [...cur.via, dep.to],
+      };
+      result.push(entry);
+      queue.push(entry);
+    }
+
+    for (const frag of graph.localFragments.get(cur.node) || []) {
+      if (seen.has(frag)) continue;
+      seen.add(frag);
+      // Local fragments are part of the prompt — traverse through them but
+      // only report ones that lead somewhere (kind "contains" entries with
+      // outgoing edges are still traversal steps, so include them).
+      const entry = { node: frag, kind: "contains", via: [...cur.via, frag] };
+      queue.push(entry);
+      if ((graph.fwd.get(frag) || []).length > 0) result.push(entry);
     }
   }
 

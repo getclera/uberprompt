@@ -52,10 +52,13 @@ Usage:
 Commands:
   graph                 Print each shared fragment with its dependents.
                           --json
-  affected              Show which prompts are affected by git-changed
+  affected [<node>]     With <node> (a prompt, shared fragment, or
+                        prompt.fragment): show what depends on it and what it
+                        depends on, with backing files.
+                        Without <node>: show prompts affected by git-changed
                         prompt/fragment files.
-                          --base <ref>   compare against ref (default HEAD)
-                          --staged       use staged changes
+                          --base <ref>   git mode: compare against ref (default HEAD)
+                          --staged       git mode: use staged changes
                           --json
   infer                 Ask the model for undeclared semantic edges.
                           --threshold <n>  confidence cutoff (default 0.7)
@@ -78,6 +81,11 @@ async function main() {
     case "graph":
       return runGraph(dir, opts);
     case "affected":
+      if (opts._[1]) {
+        const { runNodeAffected } = await import("../src/node-affected.mjs");
+        const { loadModel } = await import("../src/load.mjs");
+        return runNodeAffected(loadModel(dir), root, opts._[1], opts);
+      }
       return runAffected(dir, root, opts);
     case "infer":
       return await runInfer(dir, root, opts);
