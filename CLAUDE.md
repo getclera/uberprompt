@@ -58,7 +58,10 @@ If not, push the doc fix (doc-only fixes may go straight to main).
   merge you see land. Resolve conflicts immediately yourself — never leave a
   conflicted branch sitting; if a conflict touches the IDEA.md contract, the
   IDEA.md version wins.
-- Never force-push shared branches. Doc-only fixes may go straight to main.
+- **NEVER force-push `main` — no exceptions, it overwrites teammates' code.**
+  `--force-with-lease` is allowed only on your own feature branch (e.g. after a
+  rebase), never on main, never on a branch someone else may be using.
+- Doc-only fixes may go straight to main (normal push).
 - Secrets live in `.env` (gitignored). Never commit or print credential values.
 
 ## Keep the main session free — delegate everything heavy
