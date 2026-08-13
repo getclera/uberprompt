@@ -346,10 +346,10 @@ A local fragment with empty `text` is a **runtime input slot** (`{{ticket}}`,
 
 ## Demo script (~4 min)
 
-1. Prompt graph in the dashboard — 5 support prompts (Acme Cloud), shared fragments, edges.
+1. Prompt graph in the dashboard — 6 support prompts (Mango Republic, a mango wholesaler), shared fragments, edges.
 2. Run the demo app → **stage 1**: traces stream in, some seeded failures.
-3. Hit analyze → **stage 2**: agent writes a lesson ("never promise a refund
-   amount before checking the account").
+3. Hit analyze → **stage 2**: agent writes a lesson ("never promise a credit
+   amount before checking the delivery record").
 4. **Stage 3**: lesson becomes a proposal; approve the diff → new prompt version.
 5. **Stage 4**: sync check ripples through the graph, files consistency proposals
    for dependent prompts; approve → graph goes quiet. Rerun app → better output.
