@@ -5,6 +5,7 @@ import { resolve, isAbsolute, join } from "node:path";
 import { runGraph } from "../src/graph-cmd.mjs";
 import { runAffected } from "../src/affected.mjs";
 import { runInfer } from "../src/infer.mjs";
+import { runTracing } from "../src/tracing-cmd.mjs";
 
 function repoRoot() {
   try {
@@ -24,7 +25,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--apply" || a === "--staged" || a === "--json") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -67,6 +68,17 @@ Commands:
   infer                 Ask the model for undeclared semantic edges.
                           --threshold <n>  confidence cutoff (default 0.7)
                           --apply          merge results into edges.json
+
+  init                  Create the trace-ingestion collections and indexes
+                        (spans, plus the unique traces.traceId index that the
+                        rollup's \$merge depends on).
+  collect               Run an OTLP/HTTP receiver; any language, no SDK import.
+                        Spans land in the spans collection and roll up into traces.
+                          --port <n>       listen port (default 4318)
+                          --service <name> fallback service.name
+  tail                  Print recent traces, then stream new ones live via a
+                        MongoDB change stream.
+
   help                  Show this message.
 
 Global:
@@ -93,6 +105,10 @@ async function main() {
       return runAffected(dir, root, opts);
     case "infer":
       return await runInfer(dir, root, opts);
+    case "init":
+    case "collect":
+    case "tail":
+      return await runTracing(cmd, root, opts);
     case "help":
     case undefined:
       console.log(HELP);
