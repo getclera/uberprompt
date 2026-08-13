@@ -55,6 +55,10 @@ export function shouldStampProcessed(outcomes: PromptOutcome[]): boolean {
   return !outcomes.some((o) => o.status === "failed");
 }
 
+export function isAlreadyProcessed(lesson: LessonDoc): boolean {
+  return lesson.processedAt != null;
+}
+
 async function proposalsFor(prompt: string, fragment: string): Promise<ProposalDoc[]> {
   return proposalsCol().find({ "target.prompt": prompt, "target.fragment": fragment }).toArray();
 }
@@ -287,9 +291,15 @@ export async function applyLessonToPrompt(
 
 export async function applyLesson(
   lessonId: ObjectId,
-  opts: { only?: string } = {},
+  opts: { only?: string; force?: boolean } = {},
 ): Promise<ApplyResult> {
   const lesson = await loadLesson(lessonId);
+  if (!opts.force && isAlreadyProcessed(lesson)) {
+    console.log(
+      `[apply] lesson ${lessonId.toHexString()} already processed at ${lesson.processedAt?.toISOString()} — skipping (replayed change-stream event); pass force to re-run`,
+    );
+    return { lessonId, targets: [], dropped: [], outcomes: [], processed: true };
+  }
   const ranked = opts.only
     ? [{ prompt: opts.only, rung: "lineage" as const, reason: "explicitly requested" }]
     : await targetPrompts(lesson);
