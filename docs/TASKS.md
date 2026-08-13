@@ -1,19 +1,19 @@
 # Task board — claim before you start, check off when merged
 
 Claim = put your name in [ ] and push. One branch per task.
+NOTE (aligned): we build along the 4 pipeline stages in IDEA.md. Salvage from the
+branches listed in IDEA.md instead of rewriting.
 
-## Phase 0 — contract (blocks everything)
-- [x] (talwe/claude — PR claude/sdk-scaffold) `packages/sdk`: TS types for all collections in IDEA.md + Mongo client + `.env.example`
-- [ ] (talwe — HUMAN: needs Atlas account) Atlas: cluster, database `uberprompt`, vector indexes, connection string in shared .env
+## Setup
+- [ ] (talwe — HUMAN) Atlas cluster, db `uberprompt`, vector indexes, `.env` (MONGODB_URI, ANTHROPIC_API_KEY, VOYAGE_API_KEY)
+- [ ] (unclaimed) Re-land monorepo + SDK from `claude/sdk-scaffold` once plan is locked
 
-## Phase 1 — parallel build
-- [x] (talwe/claude — PR claude/sdk-scaffold) A: SDK — definePrompt/fragments, deps, render, traced LLM call wrapper
-- [ ] (claude agent — in progress) B: agent — change-stream listener + consistency loop (edit → ripple proposals)
-- [ ] (claude agent — in progress) B2: agent — learning loop (traces → lessons → proposals)
-- [ ] (claude agent — in progress) C: dashboard — prompt graph view + fragment editor
-- [ ] (claude agent — in progress) C2: dashboard — proposal inbox (diff, approve/reject) + trace list
-- [ ] (claude agent — in progress) D: demo app — recruiting-outreach prompts + seed script + failure traces
+## The four main tasks
+- [ ] (unclaimed) 1 — Trace ingestion: SDK tracedCall + demo app generating traces
+- [ ] (unclaimed) 2 — Analyze/learn: trace batches → lessons (embedded, deduped)
+- [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
+- [ ] (unclaimed) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
+- [ ] (unclaimed) Dashboard: pipeline view of the 4 stages + graph + proposal inbox
 
-## Phase 2 — demo
-- [ ] (unclaimed) Wire full demo flow end-to-end, dry-run the 4-min script (IDEA.md)
-- [ ] (unclaimed) Polish dashboard for stage (dark theme, big fonts)
+## Demo
+- [ ] (unclaimed) Wire end-to-end, dry-run the 4-min script in IDEA.md
