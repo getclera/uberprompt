@@ -32,6 +32,17 @@ Three prepped tmux panes: **A** = commands, **B** = `uberprompt tail` (live trac
 LLM latency doesn't matter on video — long waits get cut; a failed call means a
 retake, so the reset script (task 5) is the critical piece.
 
+## Setup status
+
+- Probe runner: `node apps/demo/scenarios/run-ticket.mjs` — loads triage-router
+  from Mongo, calls gpt-5.1, prints lane. Verified: FreshMart $70k ticket →
+  `escalation` (confidence 0.97) on v1 state, ~1.3s.
+- Reset: `node apps/demo/scenarios/reset.mjs` — reverts scenario file edits,
+  wipes demo collections, reseeds v1 prompts/edges/traces. Verified live.
+- Still open: mid-part rehearsal (scenario apply → push v2 to Mongo with
+  prompt_versions snapshot → `uberprompt sync-check` finds the routing-rules
+  paraphrase → approve → probe flips to `order`), timings for those steps.
+
 ## Setup tasks (before stage)
 
 1. **Env + Atlas ready**: `.env` complete (MONGODB_URI, OPENAI_API_KEY,

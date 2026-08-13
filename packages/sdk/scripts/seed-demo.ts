@@ -135,7 +135,7 @@ async function seedTraces(): Promise<void> {
         latencyMs: seed.meta.latencyMs,
         tokens: seedTokens(seed.meta.tokens),
       },
-      spanCount: 0,
+      spanCount: 1,
       ts: new Date(seed.ts),
     };
     if (version?._id !== undefined) doc.promptVersionId = version._id;
