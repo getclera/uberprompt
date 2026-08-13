@@ -8,16 +8,16 @@ Create the trace-ingestion collections and indexes required by the pipeline.
 uberprompt init
 ```
 
-Connects to the MongoDB database specified by `MONGODB_URI` and ensures the following exist:
+Connects to the MongoDB database in `MONGODB_URI` and creates the following if they don't exist:
 
 **Collections:**
-- `spans` -- raw OpenTelemetry spans, one per LLM call or tool execution
-- `traces` -- rollup documents, one per root operation (derived from spans via `$merge`)
+- `spans`: raw OpenTelemetry spans, one per LLM call or tool execution
+- `traces`: rollup documents, one per root operation (derived from spans via `$merge`)
 
 **Indexes:**
-- `traces.traceId` -- unique index, required for the `$merge` rollup to be idempotent
-- `spans.traceId` + `spans.startTime` -- compound index for efficient span lookups
-- `spans.spanId` -- unique index
+- `traces.traceId`: unique, required for the `$merge` rollup to be idempotent
+- `spans.traceId` + `spans.startTime`: compound, for span lookups
+- `spans.spanId`: unique
 
 Without the unique `traceId` index on `traces`, the rollup pipeline appends duplicate documents instead of updating in place.
 

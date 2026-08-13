@@ -1,6 +1,6 @@
 # uberprompt infer
 
-Ask a model to discover undeclared semantic edges between fragments.
+Find semantic edges between fragments that no `uses` declaration covers.
 
 ## Usage
 
@@ -8,7 +8,7 @@ Ask a model to discover undeclared semantic edges between fragments.
 uberprompt infer
 ```
 
-Reads all prompt and fragment files, sends their texts to the model (`gpt-5-nano`), and identifies pairs of fragments that are semantically related but have no declared `uses` edge. Discovered edges are written back to `apps/demo/edges.json` with `kind: "semantic"`.
+Reads all prompt and fragment files and sends their texts to `gpt-5-nano`. The model flags pairs of fragments that are related but have no declared `uses` edge. With `--apply`, the edges are written to `apps/demo/edges.json` as `kind: "semantic"`.
 
 ## Flags
 
@@ -43,6 +43,6 @@ uberprompt infer --threshold 0.85 --apply
 
 1. Loads all fragment texts from `apps/demo/fragments/` and inline fragments from `apps/demo/prompts/`
 2. Skips fragments with empty text (runtime input slots like `{{ticket}}`)
-3. Sends fragment pairs to the model for semantic similarity assessment
+3. Sends fragment pairs to the model, which scores how related each pair is
 4. Filters results by the confidence threshold
 5. With `--apply`, merges new edges into `edges.json` (existing edges are preserved)

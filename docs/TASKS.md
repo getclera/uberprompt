@@ -41,7 +41,8 @@ branches listed in IDEA.md instead of rewriting.
     streamed a new trace as it landed, via change stream.
   - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
-- [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
+- [x] (claude builder) 2 — Analyze/learn: `uberprompt learn` mines traces (`promptName` exists, error/low-score first) → per-prompt LLM lesson mining → Voyage embed → `$vectorSearch` dedup vs active lessons (≥0.92 merges trace ids via `$addToSet` instead of inserting; this is the stage's idempotency). Verified: 33/33 CLI tests + live Atlas dry-run (14 traces → 7 lessons, 3 healthy groups, 0 writes).
+  - Gotcha: the LIVE `lessons_embedding` index has no `filter` fields (create-indexes.ts declares status/appliesTo but was never re-applied) — `$vectorSearch` with `filter` errors, so `learn` fetches 5 candidates and filters `status: "active"` in code.
 - [x] (talwe+claude — done, pending merge) 3 — Apply per IDEA.md: `uberprompt
       propose / proposals / approve|reject`. Targeting ladder (lineage → catalog LLM
       pass → $vectorSearch over `descriptions_embedding`), minimal-rewrite pending
@@ -61,19 +62,25 @@ branches listed in IDEA.md instead of rewriting.
   - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
     root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
     from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
-- [x] (talwe+claude — taken over from felix, done pending merge) 4 — Semantic
-      sync check: `runSyncCheck` (packages/cli/src/sync-check.mjs, extends the
-      stage-4 prototype from PR #37) runs inline after every successful
-      approve bridge and rollback (function call, not a watcher; `--no-sync`
-      opts out) and manually via `uberprompt sync-check <prompt[.fragment]>`
-      (alias `sync`). Dependents = Mongo `edges` graph walk (felix's
-      buildGraph/dependentsOf over a thin adapter) ∪ `$vectorSearch` discovery
-      (cosine >= 0.80, top 5) with new `kind:"semantic"` edges persisted
-      (confidence/model/inferredAt); gpt-5.1 consistency check files
-      `source:"sync-check"` proposals for real conflicts. Plus: `uberprompt
-      reembed` (embedding-space backfill + verify) and `uberprompt rollback
-      <prompt> [--to N]` — restores a snapshot as a new version (append-only)
-      and fires the sync check.
+- [x] (felix + talwe+claude) 4 — Semantic sync check: `runSyncCheck`
+      (packages/cli/src/sync-check.mjs, extends felix's prototype) runs inline
+      after every successful approve bridge and rollback (function call, not a
+      watcher; `--no-sync` opts out) and manually via
+      `uberprompt sync-check <prompt[.fragment]>` (alias `sync`). Dependents =
+      Mongo `edges` graph walk (buildGraph/dependentsOf over a thin adapter,
+      shared-node aware) ∪ `$vectorSearch` discovery (cosine >= 0.80, top 5)
+      with new `kind:"semantic"` edges persisted straight into the `edges`
+      collection (confidence/model/inferredAt) — closes the "infer --apply
+      doesn't reach Mongo" gap for the sync path. gpt-5.1 consistency check
+      files `source:"sync-check"` proposals for real conflicts. Plus:
+      `uberprompt reembed` (embedding-space backfill + verify) and
+      `uberprompt rollback <prompt> [--to N]` — restores a snapshot as a new
+      version (append-only) and fires the sync check.
+  - (felix) Full-chain e2e on the Mango demo against live Atlas: reseed →
+    lesson → propose → approve refund-agent.refund-policy → infer found both
+    answer-key semantic edges → sync-check walked them, filed + approved the
+    escalation-writer.context fix → wave-2 quiet. Bug found+fixed: sync-check
+    now walks the bare shared-fragment node when a shared key changes.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo

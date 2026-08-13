@@ -2,7 +2,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"];
-const VOYAGE_URL = "https://ai.mongodb.com/v1/embeddings";
+const VOYAGE_URL =
+  process.env.VOYAGE_EMBEDDINGS_URL || "https://ai.mongodb.com/v1/embeddings";
 const VOYAGE_MODEL = "voyage-3.5-lite";
 
 export function loadEnv(repoRoot) {
