@@ -35,7 +35,10 @@ branches listed in IDEA.md instead of rewriting.
     OTLP wire decode, index bootstrap. Verified against the live cluster both ways —
     `pnpm --filter @uberprompt/tracing smoke` (AI SDK 7 in-process, multi-step + tool call)
     and `smoke:otlp` (raw OTLP payload, 7/7 assertions).
-  - [ ] `init` / `collect` / `tail` subcommands on the existing `packages/cli`.
+  - [x] `uberprompt init` / `collect` / `tail` on the existing CLI. Verified live: `init`
+    created 6 indexes; `collect` ingested a real HTTP OTLP POST (service read from the
+    payload's resource attrs, tokens + latency correct); `tail` printed history and then
+    streamed a new trace as it landed, via change stream.
   - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
 - [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
