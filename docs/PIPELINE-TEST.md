@@ -1,5 +1,14 @@
 # Stage 3→4 live pipeline test — 2026-08-13
 
+> **Historical run — pre-reseed crew.** This transcript predates the **Mango
+> Republic** reseed and was captured against the original support crew
+> (`billing-agent`, `tech-support-agent`, `triage-router`, `escalation-writer`),
+> which no longer exists. It is kept verbatim as the forensic record of the
+> stage 3→4 seam work — the proposal IDs, cosines, and stdout below are real
+> output from that run and are **not** rewritten. For the current end-to-end run
+> on the Mango Republic crew, see [DEMO-RUN.md](DEMO-RUN.md); for the crew
+> itself, see [apps/demo/README.md](../apps/demo/README.md).
+
 End-to-end run of stage 3 (`propose/proposals/approve/reject`, PR #23) against the
 live Atlas DB, plus a precise survey of what exists at the stage 3→4 seam on main.
 All numbers below are from real command output against the shared cluster.
@@ -184,24 +193,26 @@ of the loop; what remains missing is the **undeclared-dependent layer**:
    changed fragment. The salvage loop's 0.75 cutoff would flag it. Use ~0.80+ or
    top-k with an LLM contradiction check (which IDEA.md step 3 has anyway).
 
-## Remaining work for the demo loop
+## Remaining work for the demo loop — all shipped
 
-1. Update IDEA.md's "stage 3→4 handoff" to the function-call shape (approve →
-   `runSyncCheck` inline; change streams optional dashboard sugar), and chain the
-   call at the end of `runApprove` (~3 lines) so the demo needs one command, not
-   two.
-2. Re-embed backfill for the stale space (all 6 prompts + lesson 1), and add an
-   embedding-space canary so this class of drift errors loudly next time.
-3. Add the undeclared-dependent layer to `sync-check`: `findSimilarFragments`
-   (packages/sdk) over the changed fragment's new embedding, threshold ~0.80+ or
-   top-k, persist hits as `kind:"semantic"` edges — the walk then picks them up
-   unchanged. Blocked by (2).
-4. Run the converge loop for real: approve the remaining pending proposal
-   (`escalation-writer.context`), `sync-check escalation-writer`, approve any
-   sync-check proposals, repeat until quiet.
-5. Decide file-writeback (or explicitly declare Mongo the runtime source of truth
-   and the demo files seed-only).
+Every item below was closed by the stage-4 PR; kept here as the record of what
+the seam needed. The live proof is [DEMO-RUN.md](DEMO-RUN.md) (Mango Republic,
+4 waves to convergence).
 
-State left in the DB (intentionally, real progress): tech-support-agent at v2
-with the escalation-routing sentence applied and proposal `6a7e40ee…` marked
-applied; `6a7e405c…` still pending; Shlok's evaluating proposal untouched.
+1. **DONE.** IDEA.md's "stage 3→4 handoff" now states the function-call shape
+   (approve → `runSyncCheck` inline; change streams optional dashboard sugar),
+   and `runApprove` (`packages/cli/src/review.ts`) chains the call at the end of
+   every bump — the demo needs one command, not two.
+2. **DONE.** `uberprompt reembed` (`packages/cli/src/reembed.ts`) re-embeds all
+   fragments + descriptions + lessons through the current endpoint and then
+   verifies known-good similarity pairs (the `verifySpace` canary), so the
+   split-embedding-space drift errors loudly.
+3. **DONE.** `sync-check` (`packages/cli/src/sync-check.ts`) runs `$vectorSearch`
+   over the changed fragment's new embedding (cosine ≥ 0.80, top 5) and persists
+   the hits as `kind:"semantic"` edges straight into the `edges` collection; the
+   graph walk then traverses them unchanged.
+4. **DONE.** The converge loop ran for real on the Mango Republic crew — see
+   DEMO-RUN.md: 4 waves, 6 semantic edges discovered (both planted answer-key
+   deps), 2 real conflicts fixed, false positives stopped at the human gate.
+5. **DONE.** Mongo is the runtime source of truth; the `apps/demo` JSON is
+   officially seed-only (no write-back).
