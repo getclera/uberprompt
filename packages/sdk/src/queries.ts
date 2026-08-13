@@ -1,5 +1,5 @@
 import type { ChangeStreamOptions, ClientSession, Document } from "mongodb";
-import { edgesCol, evalRunsCol, getClient, getDb, lessonsCol, promptsCol, tracesCol } from "./db";
+import { edgesCol, evalRunsCol, getClient, getDb, lessonsCol, promptsCol, syncStateCol, tracesCol } from "./db";
 import { embed } from "./embeddings";
 import type { EdgeDoc, EdgeEndpoint, LessonDoc } from "./types";
 
@@ -370,10 +370,10 @@ export async function withTransaction<T>(fn: (session: ClientSession) => Promise
 
 export const LESSONS_WATCH_PIPELINE: Document[] = [{ $match: { operationType: "insert" } }];
 
-export function buildLessonsWatchOptions(resumeAfter?: unknown): ChangeStreamOptions {
+export function buildLessonsWatchOptions(startAfter?: unknown): ChangeStreamOptions {
   return {
     fullDocument: "updateLookup",
-    ...(resumeAfter !== undefined ? { resumeAfter } : {}),
+    ...(startAfter !== undefined ? { startAfter } : {}),
   };
 }
 
@@ -384,12 +384,49 @@ export interface LessonWatcher {
 
 export function watchLessons(
   onLesson: (lesson: LessonDoc, resumeToken: unknown) => void | Promise<void>,
-  opts: { resumeAfter?: unknown } = {},
+  opts: { startAfter?: unknown } = {},
 ): LessonWatcher {
-  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, buildLessonsWatchOptions(opts.resumeAfter));
+  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, buildLessonsWatchOptions(opts.startAfter));
   stream.on("change", (change) => {
     if (change.operationType === "insert" && change.fullDocument) {
       void onLesson(change.fullDocument, change._id);
+    }
+  });
+  return {
+    resumeToken: () => stream.resumeToken,
+    close: () => stream.close(),
+  };
+}
+
+export async function loadResumeToken(watcherName: string): Promise<unknown> {
+  const doc = await syncStateCol().findOne({ _id: watcherName });
+  return doc?.resumeToken ?? undefined;
+}
+
+export async function saveResumeToken(watcherName: string, token: unknown): Promise<void> {
+  await syncStateCol().updateOne(
+    { _id: watcherName },
+    { $set: { resumeToken: token, updatedAt: new Date() } },
+    { upsert: true },
+  );
+}
+
+export async function watchLessonsResumable(
+  watcherName: string,
+  onLesson: (lesson: LessonDoc) => void | Promise<void>,
+): Promise<LessonWatcher> {
+  const token = await loadResumeToken(watcherName);
+  const opts: ChangeStreamOptions = {
+    fullDocument: "updateLookup",
+    ...(token !== undefined ? { startAfter: token } : {}),
+  };
+  const stream = lessonsCol().watch(LESSONS_WATCH_PIPELINE, opts);
+  stream.on("change", (change) => {
+    if (change.operationType === "insert" && change.fullDocument) {
+      void (async () => {
+        await onLesson(change.fullDocument);
+        await saveResumeToken(watcherName, change._id);
+      })();
     }
   });
   return {
