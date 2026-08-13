@@ -1,5 +1,5 @@
 import type { ObjectId } from "mongodb";
-import { edgesCol, tracesCol, type LessonDoc, type PromptDoc, type TraceDoc } from "@uberprompt/sdk";
+import { getDependents, tracesCol, type LessonDoc, type PromptDoc, type TraceDoc } from "@uberprompt/sdk";
 import { callJson } from "../llm";
 import type { Culprit } from "./types";
 
@@ -37,10 +37,8 @@ function defaultDeps(): DiagnoseDeps {
         .limit(MAX_EXAMPLES)
         .toArray(),
     fetchSharedWith: async (fragmentKey) => {
-      const edges = await edgesCol()
-        .find({ "to.fragment": fragmentKey, kind: "uses" })
-        .toArray();
-      return edges.flatMap((e) => (e.from.prompt ? [e.from.prompt] : []));
+      const hits = await getDependents({ fragment: fragmentKey });
+      return hits.map((hit) => hit.prompt);
     },
   };
 }

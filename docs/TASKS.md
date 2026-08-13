@@ -28,6 +28,7 @@ branches listed in IDEA.md instead of rewriting.
 
 ## The four main tasks
 - [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
+<<<<<<< HEAD
   - [x] `packages/tracing`: normalize, rollup ($merge), MongoSpanExporter, registerUberprompt,
     OTLP wire decode, index bootstrap. Verified against the live cluster both ways —
     `pnpm --filter @uberprompt/tracing smoke` (AI SDK 7 in-process, multi-step + tool call)
@@ -37,6 +38,16 @@ branches listed in IDEA.md instead of rewriting.
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
 - [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
 - [ ] (unclaimed) 3 — Apply: proposals → approval → versioned prompt writes
+=======
+  - Contract in IDEA.md. Next: `packages/tracing` (normalize, rollup, exporter, register),
+    then `init` / `collect` / `tail` added as subcommands to the existing `packages/cli`,
+    then the demo app emitting real traces.
+- [ ] (unclaimed) 2 — Analyze/learn: trace batches → lessons (embedded, deduped)
+- [x] (shlok) 3 — Apply: lesson → culprit → candidate → eval gate → proposal.
+      Stage 3 emits proposals ONLY; it never writes `prompts` (verified: all prompts
+      still v1 after a full run). Contract addendum in PR #8. `pnpm --filter
+      @uberprompt/agent apply <diagnose|eval|suggest> <lessonId> <promptName>`.
+>>>>>>> d538005 (feat(agent): transitive blast radius + OpenAI embeddings)
 - [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
