@@ -67,22 +67,29 @@ One platform, zero bolt-ons:
 
 ## A real run (verified against the live cluster)
 
-From [docs/PIPELINE-TEST.md](docs/PIPELINE-TEST.md), an end-to-end pass with
-real command output: traces from a support crew produced the lesson *"never
-promise a refund amount before verifying charges"* (from `billing-agent`
-traces, extended to `escalation-writer` by the targeting ladder) and *"route to
-escalation whenever the customer mentions lawyers, legal action, or a
-regulator"* (from `triage-router`, extended to `tech-support-agent`).
-`uberprompt proposals` showed both diffs; approving the second bumped
-**tech-support-agent v1 → v2** — snapshot frozen, fragment re-embedded,
-one new sentence in the task text — and `uberprompt sync-check
-tech-support-agent` then LLM-verified the neighboring escalation rules still
-agree, terminating with "graph is quiet".
+From [docs/DEMO-RUN.md](docs/DEMO-RUN.md), an end-to-end pass on the **Mango
+Republic** crew with real command output: traces from the support crew produced
+the lesson *"never promise or confirm a specific credit or refund amount before
+verification"* (mined from `refund-agent` traces, extended to
+`escalation-writer` by the targeting ladder). Approving it bumped
+**refund-agent.refund-policy v1 → v2** — snapshot frozen, fragment re-embedded —
+and the automatic `uberprompt sync-check` rippled the change through the graph:
+`$vectorSearch` surfaced the undeclared semantic edges to
+`escalation-writer.context` (cosine 0.868) and `quality-agent.task` (0.830), the
+gpt-5.1 consistency check flagged the real contradictions in the refund wording,
+and four waves later the graph converged with "graph is quiet" — 6 semantic
+edges discovered (both planted answer-key deps), 2 real conflicts fixed, a false
+positive and stale proposals stopped at the human gate.
 
 ## Quickstart
 
 Env (`cp .env.example .env`): `MONGODB_URI` (Atlas), `MONGODB_DB`,
 `OPENAI_API_KEY` (LLM calls), `VOYAGE_API_KEY` (embeddings).
+
+**Prerequisites — no offline/mock mode.** This needs a live MongoDB Atlas
+cluster (the vector-search indexes are created by `create-indexes`), plus
+`OPENAI_API_KEY` and `VOYAGE_API_KEY` in `.env` — the learn / propose / sync
+stages call OpenAI and Voyage on every run.
 
 ```sh
 pnpm install --config.minimum-release-age=0   # ai@7 is younger than pnpm's 24h default
@@ -99,6 +106,7 @@ uberprompt tail                    # stream traces live via a change stream
 uberprompt graph                   # the prompt dependency graph, rendered
 uberprompt affected <node>         # blast radius of a prompt/fragment change
 uberprompt infer --apply           # vector+LLM discovery of undeclared semantic edges
+uberprompt learn                   # mine traces → durable, embedded lessons
 uberprompt propose                 # lessons → targeted minimal-edit proposals
 uberprompt proposals               # review pending diffs
 uberprompt approve <id>            # snapshot, rewrite, bump version, re-embed

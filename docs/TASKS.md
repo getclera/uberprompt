@@ -19,7 +19,9 @@ branches listed in IDEA.md instead of rewriting.
   - Still missing for stage 1: the `spans` collection, and a **unique index on
     `traces.traceId`** (the `$merge` key — without it the rollup duplicates instead of
     updating). Created by the stage 1 `init` subcommand.
-- [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
+- [x] (talwe — HUMAN) .env keys wired: `OPENAI_API_KEY` + `VOYAGE_API_KEY` (both in
+  `.env.example`). No `ANTHROPIC_API_KEY` — the stack runs entirely on OpenAI via the
+  AI SDK; nothing in `packages/` or `apps/` reads an Anthropic key.
 - [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.ts, raise-escalation-threshold)
@@ -30,7 +32,7 @@ branches listed in IDEA.md instead of rewriting.
     Decision: keep the custom renderer; readability via two-sided barycenter ordering.
 
 ## The four main tasks
-- [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
+- [x] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
   - [x] `packages/tracing`: normalize, rollup ($merge), MongoSpanExporter, registerUberprompt,
     OTLP wire decode, index bootstrap. Verified against the live cluster both ways —
     `pnpm --filter @uberprompt/tracing smoke` (AI SDK 7 in-process, multi-step + tool call)
@@ -39,7 +41,8 @@ branches listed in IDEA.md instead of rewriting.
     created 6 indexes; `collect` ingested a real HTTP OTLP POST (service read from the
     payload's resource attrs, tokens + latency correct); `tail` printed history and then
     streamed a new trace as it landed, via change stream.
-  - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
+  - [x] Demo traces emitted via OpenAI (AI SDK, auto-traced by `registerUberprompt()`);
+    `seed-demo` also seeds the Mango Republic crew's traces. No ANTHROPIC_API_KEY needed.
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
 - [x] (claude builder) 2 — Analyze/learn: `uberprompt learn` mines traces (`promptName` exists, error/low-score first) → per-prompt LLM lesson mining → Voyage embed → `$vectorSearch` dedup vs active lessons (≥0.92 merges trace ids via `$addToSet` instead of inserting; this is the stage's idempotency). Verified: 33/33 CLI tests + live Atlas dry-run (14 traces → 7 lessons, 3 healthy groups, 0 writes).
   - Gotcha: the LIVE `lessons_embedding` index has no `filter` fields (create-indexes.ts declares status/appliesTo but was never re-applied) — `$vectorSearch` with `filter` errors, so `learn` fetches 5 candidates and filters `status: "active"` in code.
@@ -59,9 +62,10 @@ branches listed in IDEA.md instead of rewriting.
   - [x] (shlok) One approve path: `uberprompt approve` bridges to
         `approveProposal` (sdk); `review.ts`'s duplicate — which never wrote
         `contentHash` and never inserted the new-version snapshot — is deleted.
-  - Gotcha: the CLI's tsx bridges must spawn from a package dir, not the repo
-    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.ts` still spawns
-    from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
+  - Gotcha (FIXED): the CLI's tsx bridges must spawn from a package dir, not the repo
+    root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.ts` now resolves the
+    workspace root from its own file location and spawns `pnpm exec tsx` with
+    `cwd: root`, so `uberprompt init|collect|tail` no longer hits `Command "tsx" not found`.
 - [x] (felix + talwe+claude) 4 — Semantic sync check: `runSyncCheck`
       (packages/cli/src/sync-check.ts, extends felix's prototype) runs inline
       after every successful approve bridge and rollback (function call, not a
