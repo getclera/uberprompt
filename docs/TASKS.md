@@ -24,6 +24,7 @@ branches listed in IDEA.md instead of rewriting.
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
 - [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)
+- [x] (felix/claude) CLI graph visualization: `uberprompt graph [node]` map/tree/impact views + tests
 
 ## The four main tasks
 - [ ] (julian) 1 — Trace ingestion: OTLP → `spans` → `traces` rollup, SDK + CLI, demo app traces
