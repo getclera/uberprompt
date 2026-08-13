@@ -135,10 +135,28 @@ describe("toSpanDoc", () => {
     });
   });
 
-  // Attribute keys contain literal dots, which Mongo would read as a path if nested.
-  it("keeps the raw attribute bag flat and verbatim", () => {
+  // Dots are replaced with __ on the way in: Mongo reads a dotted key as a path, and
+  // a wildcard index cannot cover field names containing dots.
+  it("stores attribute keys with dots escaped", () => {
     const doc = toSpanDoc(raw({ attributes: { "gen_ai.request.model": "m", "ai.prompt": "p" } }), "s");
-    assert.equal(doc.attributes["gen_ai.request.model"], "m");
-    assert.equal(doc.attributes["ai.prompt"], "p");
+    assert.equal(doc.attributes.gen_ai__request__model, "m");
+    assert.equal(doc.attributes.ai__prompt, "p");
+    assert.equal(doc.attributes["gen_ai.request.model"], undefined);
+  });
+
+  it("escapes resource keys the same way", () => {
+    const doc = toSpanDoc(raw({ resource: { "service.name": "svc", "telemetry.sdk.language": "python" } }), "s");
+    assert.equal(doc.resource.telemetry__sdk__language, "python");
+  });
+
+  // Promotion must read the original dotted keys, not the escaped ones — otherwise
+  // sanitizing would silently blank out every promoted field.
+  it("still promotes typed fields even though stored keys are escaped", () => {
+    const doc = toSpanDoc(
+      raw({ attributes: { "gen_ai.request.model": "claude-opus-5" }, resource: { "service.name": "svc" } }),
+      "fallback",
+    );
+    assert.equal(doc.genAi?.requestModel, "claude-opus-5");
+    assert.equal(doc.service, "svc");
   });
 });
