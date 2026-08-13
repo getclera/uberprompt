@@ -25,7 +25,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--apply" || a === "--staged" || a === "--json" || a === "--dry-run" || a === "--all") {
       opts[a.slice(2)] = true;
-    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--against") {
+    } else if (a === "--dir" || a === "--base" || a === "--threshold" || a === "--port" || a === "--service" || a === "--model" || a === "--against" || a === "--limit" || a === "--dedup-threshold") {
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) {
       // --key=value form
@@ -83,6 +83,15 @@ Commands:
                         you see whether a new prompt version actually helped.
                           --json
 
+  learn                 Stage 2: mine recent traces (prioritizing errors and low
+                        scores) into durable lessons, embed them via Voyage, and
+                        vector-dedup against existing active lessons — a near-
+                        duplicate merges its trace ids instead of inserting.
+                          --limit <n>            traces to read (default 100)
+                          --model <m>            LLM to use (default gpt-5.1)
+                          --dedup-threshold <t>  cosine cutoff (default 0.92)
+                          --dry-run              print without writing anything
+
   propose               Consume unprocessed lessons into pending proposals via
                         the targeting ladder (lineage -> catalog -> RAG).
                           --dry-run        print without writing anything
@@ -133,6 +142,10 @@ async function main() {
     case "tail":
     case "compare":
       return await runTracing(cmd, root, opts);
+    case "learn": {
+      const { runLearn } = await import("../src/learn.mjs");
+      return await runLearn(root, opts);
+    }
     case "propose": {
       const { runPropose } = await import("../src/propose.mjs");
       return await runPropose(root, opts);
