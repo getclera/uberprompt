@@ -42,19 +42,17 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
   `MONGODB_URI`, `MONGODB_DB`, `OPENAI_API_KEY`.
 - **`proposals [--all]`** — list pending (default) or all proposals with a
   compact word-level old→new diff.
-- **`approve <id>` / `reject <id>`** — approve snapshots the pre-change prompt
-  into `prompt_versions` (with `contentHash`), applies `newText` to the target
-  fragment, bumps the version, re-embeds the fragment via Voyage
-  (`ai.mongodb.com`, voyage-3.5-lite), snapshots the post-change version too,
-  marks the proposal `applied`, and then runs the stage-4 sync check inline
-  (`--no-sync` skips it). Reject just flips the status. Approve also needs
-  `VOYAGE_API_KEY`.
-- **`sync <prompt[.fragment]> [--dry-run] [--model gpt-5.1]`** — stage 4,
-  manual run (approve/rollback trigger it automatically). Diffs the prompt's
-  current version against its latest `prompt_versions` snapshot, walks the
-  Mongo `edges` graph for declared + transitive dependents of each changed
-  fragment, discovers undeclared dependents via `$vectorSearch` over
-  `fragments_embedding` (cosine >= 0.80, top 5, same prompt excluded),
+- **`approve <id>` / `reject <id>`** — approve bridges to the SDK's
+  transactional `approveProposal` (version bump + `contentHash` + re-embed +
+  new-version `prompt_versions` snapshot + `status: "applied"`), then runs the
+  stage-4 sync check inline (`--no-sync` skips it). Reject just flips the
+  status. Approve also needs `VOYAGE_API_KEY`.
+- **`sync-check <prompt[.fragment]> [--dry-run] [--model gpt-5.1]`** (alias:
+  `sync`) — stage 4, manual run (approve/rollback trigger it automatically).
+  Diffs the prompt's current version against its latest `prompt_versions`
+  snapshot, walks the Mongo `edges` graph for declared + transitive dependents
+  of each changed fragment, discovers undeclared dependents via `$vectorSearch`
+  over `fragments_embedding` (cosine >= 0.80, top 5, same prompt excluded),
   persists new `kind:"semantic"` edges (`confidence`, `model`, `inferredAt`),
   LLM-checks every dependent fragment for contradiction, and files
   `source: sync-check` proposals for real conflicts (identical pending dupes

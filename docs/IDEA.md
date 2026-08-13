@@ -60,7 +60,7 @@ duplicate logic in `packages/cli/src/review.mjs` is gone.
 **Stage 3→4 handoff (DECIDED, shipped):** stage 4 is a function call, not a
 watcher — after a successful approve bridge (and after `rollback`), the CLI
 invokes `runSyncCheck(prompt, fragment, newText)` inline (`--no-sync` opts
-out). `uberprompt sync <prompt[.fragment]>` reruns it manually for a bump that
+out). `uberprompt sync-check <prompt[.fragment]>` reruns it manually for a bump that
 happened without one; it diffs current against the latest snapshot with
 `version < current`. Change streams remain optional dashboard sugar, not a
 dependency of the loop.
@@ -70,9 +70,9 @@ per prompt (one approval = one version bump). Apply does NOT walk dependencies �
 that's stage 4, triggered by the version bump.
 
 ### 4. Semantic sync check (needs the dependency graph) — SHIPPED
-ONE shared mechanism (`runSyncCheck` in packages/cli/src/sync.mjs), invoked as
-a function call at the end of every version bump (approve, rollback, or a
-manual `uberprompt sync`) — NOT a change-stream watcher:
+ONE shared mechanism (`runSyncCheck` in packages/cli/src/sync-check.mjs),
+invoked as a function call at the end of every version bump (approve,
+rollback, or a manual `uberprompt sync-check`) — NOT a change-stream watcher:
 1. Collect dependents via a graph walk over the Mongo `edges` collection
    (declared `uses` + known `semantic`, direct + transitive through shared
    fragments).

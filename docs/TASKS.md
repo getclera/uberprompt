@@ -62,29 +62,31 @@ branches listed in IDEA.md instead of rewriting.
     root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
     from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
 - [x] (talwe+claude — taken over from felix, done pending merge) 4 — Semantic
-      sync check: `runSyncCheck` (packages/cli/src/sync.mjs) runs inline after
-      every successful approve bridge and rollback (function call, not a
-      watcher; `--no-sync` opts out) and manually via
-      `uberprompt sync <prompt[.fragment]>`. Dependents = Mongo `edges` graph
-      walk (felix's buildGraph/dependentsOf over a thin adapter) ∪
-      `$vectorSearch` discovery (cosine >= 0.80, top 5) with new
-      `kind:"semantic"` edges persisted (confidence/model/inferredAt); gpt-5.1
-      consistency check files `source:"sync-check"` proposals for real
-      conflicts. Plus: `uberprompt reembed` (embedding-space backfill + verify)
-      and `uberprompt rollback <prompt> [--to N]` — restores a snapshot as a
-      new version (append-only) and fires the sync check.
+      sync check: `runSyncCheck` (packages/cli/src/sync-check.mjs, extends the
+      stage-4 prototype from PR #37) runs inline after every successful
+      approve bridge and rollback (function call, not a watcher; `--no-sync`
+      opts out) and manually via `uberprompt sync-check <prompt[.fragment]>`
+      (alias `sync`). Dependents = Mongo `edges` graph walk (felix's
+      buildGraph/dependentsOf over a thin adapter) ∪ `$vectorSearch` discovery
+      (cosine >= 0.80, top 5) with new `kind:"semantic"` edges persisted
+      (confidence/model/inferredAt); gpt-5.1 consistency check files
+      `source:"sync-check"` proposals for real conflicts. Plus: `uberprompt
+      reembed` (embedding-space backfill + verify) and `uberprompt rollback
+      <prompt> [--to N]` — restores a snapshot as a new version (append-only)
+      and fires the sync check.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
-- [x] (talwe+claude — done) Wire end-to-end: LIVE convergence run recorded in
-      `docs/DEMO-RUN.md` (the on-stage script). Approved the pending
-      escalation-writer.context proposal → sync check discovered the
-      answer-key semantic edge context→refund-policy (0.848) → filed 1
-      consistency proposal → approved → wave 2 walked back through the new
-      edge, judged consistent, graph quiet. 2 waves to convergence; manual
-      `sync tech-support-agent` also run (surfaces routing-rules 0.849 +
-      escalation-criteria 0.832, all consistent). Operational loop taught to
-      any session via `.claude/skills/sync-loop/SKILL.md`.
+- [x] (talwe+claude — done) Wire end-to-end: LIVE convergence runs recorded
+      verbatim in `docs/DEMO-RUN.md` (feeds docs/DEMO.md's video). On the
+      Mango Republic crew: 4 waves to convergence, 6 semantic edges
+      discovered (incl. both planted answer-key deps at 0.868/0.862), 2 real
+      conflicts fixed, 1 false positive + 2 stale/redundant proposals stopped
+      at the human gate. NOTE: a reset/rehearsal loop restored the cluster to
+      pristine v1 at 23:04Z (proposals/lessons/semantic edges wiped) — that
+      is the intended pre-video state; the runs live on in DEMO-RUN.md.
+      Operational loop taught to any session via
+      `.claude/skills/sync-loop/SKILL.md`.
   - Stage 3 verified live (Aug 13): approved proposal `6a7e40ee…` for real —
     tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
     evidence in `docs/PIPELINE-TEST.md`.
