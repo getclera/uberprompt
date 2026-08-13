@@ -16,9 +16,9 @@ function stripLen(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
 
-function leftRows(model, fwd, c) {
+function leftRows(promptOrder, fwd, c) {
   const rows = [];
-  for (const name of [...model.prompts.keys()].sort()) {
+  for (const name of promptOrder) {
     rows.push({ id: name, text: c.cyan(c.bold(name)), plain: name });
     const locals = [...fwd.keys()]
       .filter((k) => k.startsWith(name + "."))
@@ -54,23 +54,47 @@ export function renderMap(model, opts = {}) {
     }
   }
 
-  const rows = leftRows(model, fwd, c);
-  const rowOf = new Map();
-  rows.forEach((r, i) => r && rowOf.set(r.id, i));
-
-  const fragments = [...model.fragments.keys()];
-  const sources = new Map(fragments.map((f) => [f, []]));
+  const fragments = [...model.fragments.keys()].sort();
+  const promptTargets = new Map();
   for (const [from, outs] of fwd) {
-    for (const out of outs) {
-      if (sources.has(out.to) && rowOf.has(from)) {
-        sources.get(out.to).push({ from, kind: out.kind });
+    const owner = from.includes(".") ? from.slice(0, from.indexOf(".")) : from;
+    if (!promptTargets.has(owner)) promptTargets.set(owner, []);
+    promptTargets.get(owner).push(...outs.map((o) => o.to));
+  }
+
+  let promptOrder = [...model.prompts.keys()].sort();
+  let rows, rowOf, barycenter;
+  const avg = (xs, fallback) =>
+    xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : fallback;
+
+  const sources = new Map(fragments.map((f) => [f, []]));
+  const rebuild = () => {
+    rows = leftRows(promptOrder, fwd, c);
+    rowOf = new Map();
+    rows.forEach((r, i) => r && rowOf.set(r.id, i));
+    for (const f of fragments) sources.get(f).length = 0;
+    for (const [from, outs] of fwd) {
+      for (const out of outs) {
+        if (sources.has(out.to) && rowOf.has(from)) {
+          sources.get(out.to).push({ from, kind: out.kind });
+        }
       }
     }
-  }
-  const barycenter = (f) => {
-    const rs = sources.get(f).map((s) => rowOf.get(s.from));
-    return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : rows.length;
+    barycenter = (f) =>
+      avg(sources.get(f).map((s) => rowOf.get(s.from)), rows.length);
   };
+
+  rebuild();
+  for (let sweep = 0; sweep < 3; sweep++) {
+    fragments.sort((a, b) => barycenter(a) - barycenter(b) || (a < b ? -1 : 1));
+    const fragIdx = new Map(fragments.map((f, i) => [f, i]));
+    promptOrder = [...promptOrder].sort((a, b) => {
+      const ka = avg((promptTargets.get(a) || []).map((t) => fragIdx.get(t)), fragments.length);
+      const kb = avg((promptTargets.get(b) || []).map((t) => fragIdx.get(t)), fragments.length);
+      return ka - kb || (a < b ? -1 : 1);
+    });
+    rebuild();
+  }
   fragments.sort((a, b) => barycenter(a) - barycenter(b) || (a < b ? -1 : 1));
 
   const free = [];
