@@ -1,6 +1,6 @@
 # Getting Started
 
-üBerprompt is a prompt management pipeline that traces LLM calls, builds a dependency graph between prompts and shared fragments, and keeps them semantically in sync.
+überPrompt is a prompt management pipeline that traces LLM calls, builds a dependency graph between prompts and shared fragments, and keeps them semantically in sync.
 
 ## Prerequisites
 
