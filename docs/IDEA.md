@@ -87,6 +87,60 @@ edges (documents), traces (documents), lessons = agent memory (documents +
 **Atlas Vector Search** over Voyage embeddings), and **change streams** as the event
 bus that wakes the agent. The DB *is* the agent's memory and nervous system.
 
+### MongoDB features we leverage (beyond basic documents + vector search)
+
+1. **Compound vector search filters** — vector indexes on `lessons` and `prompts`
+   include `filter` fields (`status`, `appliesTo`) so stage 3 RAG searches only
+   active lessons and can scope by prompt name. Array-of-string filter fields do
+   element-match.
+
+2. **$jsonSchema validators** — every collection gets `validationLevel: "strict"`,
+   `validationAction: "error"` at creation time. Enforces required fields, bsonType,
+   enum constraints (e.g. `status: enum ["ok","error"]` on spans). Catches bad
+   inserts immediately — aligns with "error loudly" rule.
+
+3. **TTL indexes** — auto-expire telemetry: spans 30d (`ingestedAt`), traces 90d
+   (`ts`). Never TTL lessons (durable memory, lifecycle via `status` field).
+
+4. **Aggregation pipeline for dashboard analytics:**
+   - `$facet` — single query powering multiple dashboard panels (latency
+     percentiles, error rates, token usage by prompt).
+   - `$densify` + `$fill` — zero-filled time series for charts, no client-side
+     gap-patching.
+   - `$setWindowFields` — rolling 1h avg latency per prompt, moving error rate
+     over trailing N traces.
+   - `$bucket` — latency distribution histograms.
+   - `$percentile` (approximate) — p50/p95/p99 latency in one pass.
+
+5. **`$graphLookup`** — recursive traversal of `edges` collection for stage 4
+   transitive dependent discovery. Cycle detection is native (no special code).
+   `depthField` maps to sync-check "shrinking waves". Caveat: `$vectorSearch`
+   cannot nest inside `$graphLookup` — declared + undeclared dependent discovery
+   stays two separate queries composed in app code.
+
+6. **Change streams (resumable)** — resume tokens persisted in a `sync_state`
+   collection (stays "one platform"). Use `startAfter` (not `resumeAfter` —
+   survives invalidate events). Watch `prompt_versions` inserts for stage 4
+   trigger. Pipeline filtering projects only needed fields to stay under 16MB
+   event limit.
+
+7. **Wildcard indexes** on `spans.attributes` and `spans.resource` — supports
+   ad-hoc queries on arbitrary OTel attributes. Prerequisite: sanitize dotted
+   OTel keys (e.g. `gen_ai.request.model`) to `gen_ai__request__model` at ingest
+   time — MongoDB parses dots as nested path traversal.
+
+8. **Materialized views via `$merge`** — spans→traces rollup (`on: "traceId"`,
+   `whenMatched: "replace"`). Second view: per-prompt daily error rates into
+   `prompt_error_rates_daily`.
+
+### If time allows
+
+- **Atlas Search + `$rankFusion`** — full-text search indexes on prompt
+  fragments, lesson text, and trace outputs. `$rankFusion` (GA on Atlas 8.0+)
+  fuses text + vector results via reciprocal rank fusion — upgrades stage 2
+  lesson dedup (catches near-duplicates sharing terms but embedding differently)
+  and powers a dashboard search bar.
+
 ## Data model — THE CONTRACT (edit here first, then code)
 
 Database `uberprompt`, collections:
@@ -102,8 +156,11 @@ Database `uberprompt`, collections:
 
 // prompt_versions — immutable, append-only snapshots
 // (same shape + { promptName, frozenAt, contentHash })
-// contentHash = sha256 of { template, fragments:[{key,text}] } — version identity is
-// deterministic, so re-running definePrompt with unchanged text never bumps a version.
+// contentHash = sha256 of { template, fragments:[{key,text}] }, fragments sorted by key
+// so the hash tracks content, not the caller's iteration order. Version identity is
+// deterministic: re-running definePrompt with unchanged text never bumps a version, and
+// takes an early return that skips the description + embedding API calls entirely.
+// Legacy docs written before this get their hash backfilled in place, without a bump.
 
 // edges — dependency graph; fragment-only endpoint = shared fragment
 // (matches apps/demo/edges.json + expected-semantic-edges.json)
