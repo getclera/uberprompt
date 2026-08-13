@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { EvalRunSummary, ProposalDoc } from "@uberprompt/sdk";
-import { hasOpenProposalForLesson, isDuplicateProposal, proposalUpdate } from "./index";
+import { hasOpenProposalForLesson, isDuplicateProposal, proposalUpdate, type PromptOutcome } from "./index";
 import type { Candidate } from "./types";
 
 const candidate: Candidate = { newText: "confirm the amount first", reason: "lesson L-1" };
@@ -82,4 +82,20 @@ test("an open proposal from the same lesson short-circuits reprocessing", () => 
 test("a proposal from a different source does not block this lesson", () => {
   const open = [proposal("something")];
   assert.equal(hasOpenProposalForLesson(open, new ObjectId()), false);
+});
+
+test("a target with nothing to evaluate is skipped, not reported as a loss", () => {
+  const outcome: PromptOutcome = {
+    prompt: "escalation-writer",
+    status: "skipped",
+    reason: "no evaluable cases",
+    reports: [],
+  };
+  assert.notEqual(outcome.status, "rejected");
+  assert.equal(outcome.reports.length, 0);
+});
+
+test("a failed target is distinguishable from a rejected one", () => {
+  const statuses: Array<PromptOutcome["status"]> = ["pending", "rejected", "skipped", "failed"];
+  assert.equal(new Set(statuses).size, 4);
 });

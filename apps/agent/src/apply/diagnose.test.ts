@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import type { FragmentHit, LessonDoc, PromptDoc, TraceDoc } from "@uberprompt/sdk";
-import { findCulprit, type DiagnoseDeps, type RelatedRow } from "./diagnose";
+import { findCulprit, type DiagnoseDeps, type RelatedRow, normalizeFragmentKey } from "./diagnose";
 
 const TASK_TEXT =
   "You are the billing agent for Acme Cloud. Read the account context before answering, and process refunds only when they fit policy.";
@@ -279,4 +279,11 @@ test("diagnosis succeeds with an empty undeclared radius", async () => {
   assert.equal(culprit.fragment, "refund-policy");
   assert.equal(culprit.span, SPAN);
   assert.deepEqual(culprit.undeclared, []);
+});
+
+test("a fragment key echoed back with the prompt's [brackets] is normalized, not rejected", () => {
+  assert.equal(normalizeFragmentKey("[task]"), "task");
+  assert.equal(normalizeFragmentKey("  [refund-policy]  "), "refund-policy");
+  assert.equal(normalizeFragmentKey("task"), "task");
+  assert.equal(normalizeFragmentKey("[[brand-voice]]"), "brand-voice");
 });

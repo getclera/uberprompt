@@ -105,7 +105,7 @@ export function proposalUpdate(
 export interface PromptOutcome {
   prompt: string;
   rung?: TargetRung;
-  status: "pending" | "rejected" | "skipped";
+  status: "pending" | "rejected" | "skipped" | "failed";
   reason: string;
   proposalId?: ObjectId;
   culprit?: Culprit;
@@ -158,6 +158,16 @@ export async function applyLessonToPrompt(
   const proposalId = inserted.insertedId;
 
   const cases = await collectCases(lesson, promptName);
+  if (cases.length === 0) {
+    await proposalsCol().deleteOne({ _id: proposalId });
+    return {
+      prompt: promptName,
+      status: "skipped",
+      reason: `no evaluable cases for ${promptName} — it has no failing traces from this lesson and no golden set, so the gate cannot judge a candidate`,
+      culprit,
+      reports: [],
+    };
+  }
   const examples = await failingExamplesFor(culprit.traceIds);
 
   const runIds: ObjectId[] = [];
@@ -249,8 +259,18 @@ export async function applyLesson(
 
   const outcomes: PromptOutcome[] = [];
   for (const target of targets) {
-    const outcome = await applyLessonToPrompt(lesson, target.prompt);
-    outcomes.push({ ...outcome, rung: target.rung });
+    try {
+      const outcome = await applyLessonToPrompt(lesson, target.prompt);
+      outcomes.push({ ...outcome, rung: target.rung });
+    } catch (error) {
+      outcomes.push({
+        prompt: target.prompt,
+        rung: target.rung,
+        status: "failed",
+        reason: error instanceof Error ? error.message : String(error),
+        reports: [],
+      });
+    }
   }
 
   await lessonsCol().updateOne({ _id: lessonId }, { $set: { processedAt: new Date() } });

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "legal-threat-handoff",
+    "input": {
+      "ticketId": "AC-10604",
+      "subject": "Final notice before we involve our attorney",
+      "body": "Acme Cloud lost three days of our customer data after your migration. If this isn't fixed and compensated by Friday our legal team will file suit.",
+      "transcript": "Customer reported data loss after the June migration. Two prior contacts, no resolution. Account is on Business, roughly $18k ARR."
+    },
+    "intent": "Writes an internal summary for a teammate — not the customer — that leads with the legal threat and the data loss, states the account value, and gives the specialist a concrete first action. Flags refund or credit exposure as something to verify rather than asserting a figure."
+  },
+  {
+    "id": "refund-exposure-unquantified",
+    "input": {
+      "ticketId": "AC-10611",
+      "subject": "Want a full refund for the year",
+      "body": "We've been down more than up this quarter. We want the whole annual plan refunded.",
+      "transcript": "Annual Business plan purchased 7 months ago. Customer cites repeated outages. No amount has been verified against billing yet."
+    },
+    "intent": "Notes the refund exposure — outside the 30-day window, annual plan would be pro-rated, and a refund this size needs a lead's sign-off — WITHOUT stating a specific dollar figure as if it were confirmed. Must still be decisive and useful to the specialist rather than hedging everything."
+  }
+]
