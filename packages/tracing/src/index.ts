@@ -4,6 +4,7 @@ export * from "./exporter";
 export * from "./indexes";
 export * from "./normalize";
 export * from "./otlp";
+export * from "./protobuf";
 export * from "./register";
 export * from "./rollup";
 export * from "./writer";
