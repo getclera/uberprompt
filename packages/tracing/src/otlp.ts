@@ -57,9 +57,16 @@ function decodeAttributes(attributes: OtlpKeyValue[] | undefined): Record<string
   return out;
 }
 
-function nanosToDate(value: string | number | undefined): Date {
-  if (value === undefined) return new Date(0);
-  return new Date(Number(BigInt(value) / 1000000n));
+// Returns undefined rather than the epoch for a missing timestamp: an unfinished span
+// with endTime pinned to 1970 yields a hugely negative duration that lands in the
+// rollup as negative latency. BigInt throws on non-integer input, so guard that too.
+function nanosToDate(value: string | number | undefined): Date | undefined {
+  if (value === undefined || value === "") return undefined;
+  try {
+    return new Date(Number(BigInt(value) / 1000000n));
+  } catch {
+    return undefined;
+  }
 }
 
 function decodeKind(kind: number | string | undefined): string {
@@ -82,13 +89,16 @@ export function decodeOtlpTraces(payload: OtlpPayload, fallbackService: string):
       for (const span of scope.spans ?? []) {
         if (span.traceId === undefined || span.spanId === undefined) continue;
 
+        const startTime = nanosToDate(span.startTimeUnixNano);
+        if (startTime === undefined) continue;
+
         const raw: RawSpan = {
           traceId: span.traceId,
           spanId: span.spanId,
           name: span.name ?? "unknown",
           kind: decodeKind(span.kind),
-          startTime: nanosToDate(span.startTimeUnixNano),
-          endTime: nanosToDate(span.endTimeUnixNano),
+          startTime,
+          endTime: nanosToDate(span.endTimeUnixNano) ?? startTime,
           status: isError(span.status?.code) ? "error" : "ok",
           attributes: decodeAttributes(span.attributes),
           resource,

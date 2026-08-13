@@ -33,6 +33,9 @@ class Reader {
       result |= BigInt(byte & 0x7f) << shift;
       if ((byte & 0x80) === 0) return result;
       shift += 7n;
+      // A 64-bit varint is at most 10 bytes; without this bound a run of continuation
+      // bytes spins over the whole payload before failing.
+      if (shift > 63n) throw new Error("varint overflow");
     }
   }
 
@@ -44,16 +47,21 @@ class Reader {
     if (wire === WIRE_VARINT) return { no, wire, varint: this.varint() };
     if (wire === WIRE_BYTES) {
       const len = Number(this.varint());
+      // Without this the offset advances past a length the buffer never contained,
+      // desynchronizing every field that follows.
+      if (len < 0 || this.offset + len > this.buf.length) throw new Error("truncated bytes field");
       const bytes = this.buf.subarray(this.offset, this.offset + len);
       this.offset += len;
       return { no, wire, bytes };
     }
     if (wire === WIRE_FIXED64) {
+      if (this.offset + 8 > this.buf.length) throw new Error("truncated fixed64");
       const view = new DataView(this.buf.buffer, this.buf.byteOffset + this.offset, 8);
       this.offset += 8;
       return { no, wire, fixed64: view.getBigUint64(0, true) };
     }
     if (wire === WIRE_FIXED32) {
+      if (this.offset + 4 > this.buf.length) throw new Error("truncated fixed32");
       this.offset += 4;
       return { no, wire };
     }

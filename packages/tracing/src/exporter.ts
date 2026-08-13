@@ -28,9 +28,9 @@ export class MongoSpanExporter implements SpanExporter {
     this.pending = this.pending
       .then(() => writeSpans(docs))
       .then(
-        () => resultCallback({ code: ExportResultCode.SUCCESS }),
+        () => this.report(resultCallback, { code: ExportResultCode.SUCCESS }),
         (error: unknown) =>
-          resultCallback({
+          this.report(resultCallback, {
             code: ExportResultCode.FAILED,
             error: error instanceof Error ? error : new Error(String(error)),
           }),
@@ -41,8 +41,24 @@ export class MongoSpanExporter implements SpanExporter {
     await this.forceFlush();
   }
 
+  // Exports queued while a flush is in flight append to the chain after it was
+  // captured, so awaiting once can return with spans still unwritten.
   async forceFlush(): Promise<void> {
-    await this.pending;
+    let awaited: Promise<unknown>;
+    do {
+      awaited = this.pending;
+      await awaited;
+    } while (this.pending !== awaited);
+  }
+
+  // A throwing callback would reject the shared chain and be reported as the failure
+  // of every subsequent export.
+  private report(callback: (result: ExportResult) => void, result: ExportResult): void {
+    try {
+      callback(result);
+    } catch (err) {
+      console.warn(`span export callback threw: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   private toRawSpan(span: ReadableSpan): RawSpan {

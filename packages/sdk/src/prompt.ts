@@ -52,7 +52,9 @@ export function computePromptContentHash(template: string, fragments: PromptFrag
     template,
     fragments: fragments
       .map((f) => ({ key: f.key, text: f.text }))
-      .sort((a, b) => a.key.localeCompare(b.key)),
+      // Codepoint order, not localeCompare: the hash is a cross-machine version
+      // identity, and locale-dependent collation would make it machine-dependent.
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
   });
   return createHash("sha256").update(canonical).digest("hex");
 }

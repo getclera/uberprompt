@@ -5,11 +5,17 @@ import { promptVersionsCol, promptsCol } from "@uberprompt/sdk";
 import { UBERPROMPT } from "./attributes";
 
 const storage = new AsyncLocalStorage<PromptRef>();
-const cache = new Map<string, PromptRef>();
+
+// Short TTL rather than an unbounded cache: stage 3 bumps prompt versions while apps are
+// running, and a cached ref would keep stamping the superseded version onto new traces —
+// silently attributing post-change traces to the pre-change version, which is exactly the
+// comparison the pipeline exists to make.
+const CACHE_TTL_MS = Number(process.env.UBERPROMPT_PROMPT_CACHE_MS ?? 10_000);
+const cache = new Map<string, { ref: PromptRef; expiresAt: number }>();
 
 export async function resolvePromptRef(name: string): Promise<PromptRef> {
   const cached = cache.get(name);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined && cached.expiresAt > Date.now()) return cached.ref;
 
   const prompt = await promptsCol().findOne({ name });
   if (prompt === null) {
@@ -29,7 +35,7 @@ export async function resolvePromptRef(name: string): Promise<PromptRef> {
     versionId: version._id,
     contentHash: version.contentHash ?? "",
   };
-  cache.set(name, ref);
+  cache.set(name, { ref, expiresAt: Date.now() + CACHE_TTL_MS });
   return ref;
 }
 
@@ -46,9 +52,8 @@ export function currentPromptRef(): PromptRef | undefined {
   return storage.getStore();
 }
 
-export function promptAttributes(runtimeContext?: Record<string, unknown>): Attributes | undefined {
-  const fromContext = runtimeContext?.uberpromptPrompt;
-  const ref = isPromptRef(fromContext) ? fromContext : currentPromptRef();
+export function promptAttributes(): Attributes | undefined {
+  const ref = currentPromptRef();
   if (ref === undefined) return undefined;
   return {
     [UBERPROMPT.name]: ref.name,
@@ -58,8 +63,3 @@ export function promptAttributes(runtimeContext?: Record<string, unknown>): Attr
   };
 }
 
-function isPromptRef(value: unknown): value is PromptRef {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.name === "string" && typeof candidate.version === "number";
-}

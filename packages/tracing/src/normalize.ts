@@ -113,7 +113,7 @@ export function toSpanDoc(raw: RawSpan, fallbackService: string): SpanDoc {
     service,
     startTime: raw.startTime,
     endTime: raw.endTime,
-    durationMs: raw.endTime.getTime() - raw.startTime.getTime(),
+    durationMs: Math.max(0, raw.endTime.getTime() - raw.startTime.getTime()),
     status: raw.status,
     attributes: raw.attributes,
     resource: raw.resource,
