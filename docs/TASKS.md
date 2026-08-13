@@ -61,7 +61,19 @@ branches listed in IDEA.md instead of rewriting.
   - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
     root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
     from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
-- [ ] (felix — in progress) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
+- [x] (felix — verified e2e on Mango, Aug 13) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
+  - Full-chain e2e on the Mango Republic demo against live Atlas: DB wiped + reseeded
+    (6 prompts, 14 traces incl. 3 seeded failures) → lesson from failing refund traces →
+    `propose` filed 4 → `approve` refund-agent.refund-policy → v2 + snapshot + re-embed →
+    `uberprompt infer` found BOTH answer-key semantic edges (0.92 / 0.85–0.88, gpt-5-nano),
+    applied + pushed to `edges` collection → `sync-check refund-agent` walked the semantic
+    edge, judged escalation-writer.context INCONSISTENT, filed a `source:"sync-check"`
+    proposal → approved → escalation-writer v2 → wave-2 sync-check quiet. Loop closed.
+  - Bug found+fixed on the way: sync-check addressed a changed shared fragment as
+    `<prompt>.<key>` — a node no edge points at — so dependents were never found.
+    Now detects shared keys via `uses` edges and walks the bare shared node.
+  - Semantic edges reach Mongo via a manual insert for now — `infer` writes edges.json
+    only; wiring `infer --apply` to also upsert the `edges` collection is open.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
