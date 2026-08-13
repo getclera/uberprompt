@@ -39,8 +39,7 @@ export async function runReject(repoRoot, id) {
   }
 }
 
-export function runApprove(cliRoot, id) {
-  if (!id) throw new Error("usage: uberprompt approve <proposalId>");
+function bridgeApprove(cliRoot, id) {
   const root = workspaceRoot(cliRoot);
   const sdkDir = join(root, "packages", "sdk");
   const entry = join(sdkDir, "scripts", "approve.ts");
@@ -50,7 +49,7 @@ export function runApprove(cliRoot, id) {
   }
 
   const envFile = join(root, ".env");
-  const args = ["exec", "tsx"];
+  const args = ["--config.verify-deps-before-run=false", "exec", "tsx"];
   if (existsSync(envFile)) args.push(`--env-file=${envFile}`);
   args.push(entry, id);
 
@@ -61,5 +60,44 @@ export function runApprove(cliRoot, id) {
       console.error(`failed to start: ${err.message}`);
       done(1);
     });
+  });
+}
+
+export async function runApprove(cliRoot, id, opts = {}) {
+  if (!id) throw new Error("usage: uberprompt approve <proposalId>");
+  const code = await bridgeApprove(cliRoot, id);
+  if (code !== 0 || opts["no-sync"]) return code;
+
+  const env = loadEnv(cliRoot);
+  requireEnv(env, ["MONGODB_URI", "MONGODB_DB"]);
+  const _id = await parseObjectId(id);
+  const { client, db } = await connect(env);
+  let applied;
+  try {
+    const proposal = await db.collection("proposals").findOne({ _id });
+    if (!proposal || proposal.status !== "applied") {
+      throw new Error(`proposal ${id} not marked applied after approve — sync check skipped`);
+    }
+    const snapshot = await db
+      .collection("prompt_versions")
+      .find({ promptName: proposal.target.prompt })
+      .sort({ version: -1 })
+      .limit(1)
+      .next();
+    applied = {
+      promptName: proposal.target.prompt,
+      fragmentKey: proposal.target.fragment,
+      oldText: proposal.oldText,
+      newText: proposal.newText,
+      refId: snapshot?._id ?? null,
+    };
+  } finally {
+    await client.close();
+  }
+  const { runSyncCheck } = await import("./sync-check.mjs");
+  return runSyncCheck(cliRoot, applied.promptName, applied.fragmentKey, applied.newText, {
+    oldText: applied.oldText,
+    refId: applied.refId,
+    model: opts.model,
   });
 }

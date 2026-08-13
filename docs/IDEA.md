@@ -57,27 +57,35 @@ lesson without getting better must not clear the gate.
 `uberprompt approve` bridges to it via `packages/sdk/scripts/approve.ts`; the old
 duplicate logic in `packages/cli/src/review.mjs` is gone.
 
-**Stage 3→4 handoff:** stage 4 runs today as an explicit call —
-`uberprompt sync-check <prompt>` after an approve. Approve now also inserts the NEW
-version's snapshot into `prompt_versions` (it used to snapshot only the pre-change
-version), so the documented `prompt_versions`-insert trigger fires for real when
-stage 4 moves to a change stream. `sync-check` still diffs current against the
-latest snapshot with `version < current`, so both orders work.
+**Stage 3→4 handoff (DECIDED, shipped):** stage 4 is a function call, not a
+watcher — after a successful approve bridge (and after `rollback`), the CLI
+invokes `runSyncCheck(prompt, fragment, newText)` inline (`--no-sync` opts
+out). `uberprompt sync-check <prompt[.fragment]>` reruns it manually for a bump that
+happened without one; it diffs current against the latest snapshot with
+`version < current`. Change streams remain optional dashboard sugar, not a
+dependency of the loop.
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
 that's stage 4, triggered by the version bump.
 
-### 4. Semantic sync check (needs the dependency graph)
-ONE shared mechanism, built once, fired on every version bump (from any source —
-lesson apply, human edit, or a prior sync-check apply):
-1. Collect dependents via declared `uses` edges.
-2. Collect undeclared dependents via vector search: changed fragment's embedding
-   vs all other fragment embeddings (existing-text vs existing-text — the
-   absent-concept problem can't occur here). Insert `kind:"semantic"` edges found.
-3. LLM checks each dependent fragment for contradiction with the change; minimal
-   rewrite → consistency proposal → back through stage 3.
-4. Waves repeat, shrinking, until the graph is quiet.
+### 4. Semantic sync check (needs the dependency graph) — SHIPPED
+ONE shared mechanism (`runSyncCheck` in packages/cli/src/sync-check.mjs),
+invoked as a function call at the end of every version bump (approve,
+rollback, or a manual `uberprompt sync-check`) — NOT a change-stream watcher:
+1. Collect dependents via a graph walk over the Mongo `edges` collection
+   (declared `uses` + known `semantic`, direct + transitive through shared
+   fragments).
+2. Collect undeclared dependents via `$vectorSearch` of the changed fragment's
+   new embedding against `fragments_embedding` (existing-text vs existing-text
+   — the absent-concept problem can't occur here). Cutoff: cosine >= 0.80
+   capped at top-5 (0.75 measured too noisy — unrelated fragments hit ~0.75).
+   Insert discovered `kind:"semantic"` edges with confidence/model/inferredAt.
+3. LLM (gpt-5.1) checks each dependent fragment for contradiction with the
+   change; minimal rewrite → `source: sync-check` proposal → back through
+   stage 3 (identical pending duplicates skipped).
+4. Waves repeat via human approvals, shrinking, until the graph is quiet.
+Live convergence run + on-stage transcript: docs/DEMO-RUN.md.
 
 Division of labor: targeting answers "where does this *lesson* belong?"; sync
 check answers "what did this *edit* break?". Both emit proposals.
@@ -126,9 +134,10 @@ bus that wakes the agent. The DB *is* the agent's memory and nervous system.
 
 6. **Change streams (resumable)** — resume tokens persisted in a `sync_state`
    collection (stays "one platform"). Use `startAfter` (not `resumeAfter` —
-   survives invalidate events). Watch `prompt_versions` inserts for stage 4
-   trigger. Pipeline filtering projects only needed fields to stay under 16MB
-   event limit.
+   survives invalidate events). Used by `uberprompt tail` for live trace
+   streaming; for stage 4 they are optional dashboard sugar only — the sync
+   check itself runs as a function call inside approve. Pipeline filtering
+   projects only needed fields to stay under 16MB event limit.
 
 7. **Wildcard indexes** on `spans.attributes` and `spans.resource` — supports
    ad-hoc queries on arbitrary OTel attributes. Prerequisite: sanitize dotted
@@ -334,7 +343,13 @@ stage 1's subcommands stay thin so the language boundary sits at the CLI edge on
   Diff helper: `diffVersions(promptName, vNew)` → changed fragments old/new text
   (computed from prompt_versions).
 
-## Prompt files (demo source format)
+## Prompt files (demo seed fixtures)
+
+**DECIDED: prompts live canonically in MongoDB.** The JSON files under
+`apps/demo` are seed fixtures only — they bootstrap the DB and never receive
+write-back; after seeding, `prompts`/`prompt_versions`/`edges` in Mongo are
+the single runtime source of truth (approve/rollback/sync mutate Mongo only,
+so the files go stale by design).
 
 The demo crew is **Mango Republic**, a mango wholesaler selling crates/pallets to
 supermarkets, juice factories, and restaurants. Six prompts:
@@ -352,7 +367,7 @@ Planted undeclared semantic deps (what stage 4 must infer): `triage-router`'s
 local `routing-rules` paraphrases escalation-criteria (incl. the $50k/year churn
 threshold); `escalation-writer`'s local `context` restates refund-policy.
 
-Source of truth for the demo lives as versioned JSON files, seeded into Mongo:
+The seed fixture files:
 
 - `apps/demo/fragments/<key>.json` — `{ key, version, text }`; shared fragments,
   canonical (brand-voice, refund-policy, escalation-criteria, output-format).

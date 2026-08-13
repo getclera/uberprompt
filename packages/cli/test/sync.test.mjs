@@ -1,7 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildGraph } from "../src/graph.mjs";
-import { modelFromMongo, diffFragments, dependentTargets } from "../src/sync-check.mjs";
+import {
+  modelFromMongo,
+  diffFragments,
+  dependentTargets,
+  sharedFragmentKeys,
+  pickSemanticHits,
+  edgeEndpoints,
+  hasEdgeBetween,
+} from "../src/sync-check.mjs";
 
 const prompts = [
   {
@@ -78,4 +86,60 @@ test("dependentTargets expands a dependent prompt into its non-empty fragments",
     "escalation-writer.escalation-criteria",
     "triage-router.routing-rules",
   ]);
+});
+
+test("sharedFragmentKeys collects fragment-only edge endpoints", () => {
+  const keys = sharedFragmentKeys(edges, "/nonexistent");
+  assert.ok(keys.has("escalation-criteria"));
+  assert.ok(keys.has("output-format"));
+  assert.ok(!keys.has("routing-rules"));
+});
+
+test("pickSemanticHits applies threshold, top-k, and same-prompt exclusion", () => {
+  const rows = [
+    {
+      name: "escalation-writer",
+      fragments: [{ key: "context", text: "x", embedding: [1, 0] }],
+    },
+    {
+      name: "triage-router",
+      fragments: [
+        { key: "routing-rules", text: "x", embedding: [1, 0.1] },
+        { key: "ticket", text: "", embedding: [1, 0] },
+        { key: "output-format", text: "x", embedding: [0, 1] },
+      ],
+    },
+    {
+      name: "billing-agent",
+      fragments: [{ key: "refund-policy", text: "x", embedding: [1, 0.05] }],
+    },
+  ];
+  const hits = pickSemanticHits(rows, "escalation-writer", [1, 0], { threshold: 0.8, topK: 5 });
+  assert.deepEqual(
+    hits.map((h) => `${h.prompt}.${h.fragment}`),
+    ["billing-agent.refund-policy", "triage-router.routing-rules"]
+  );
+  assert.ok(hits.every((h) => h.score >= 0.8));
+  const capped = pickSemanticHits(rows, "escalation-writer", [1, 0], { threshold: 0.8, topK: 1 });
+  assert.equal(capped.length, 1);
+});
+
+test("edgeEndpoints points a local fragment at a shared one, answer-key style", () => {
+  const local = { prompt: "escalation-writer", fragment: "context" };
+  const shared = { fragment: "refund-policy" };
+  assert.deepEqual(edgeEndpoints(local, shared), { from: local, to: shared });
+  const hitLocal = { prompt: "triage-router", fragment: "routing-rules" };
+  const changedShared = { fragment: "escalation-criteria" };
+  assert.deepEqual(edgeEndpoints(changedShared, hitLocal), {
+    from: hitLocal,
+    to: changedShared,
+  });
+});
+
+test("hasEdgeBetween matches either direction", () => {
+  const a = { prompt: "triage-router", fragment: "routing-rules" };
+  const b = { fragment: "escalation-criteria" };
+  assert.ok(hasEdgeBetween(edges, a, b));
+  assert.ok(hasEdgeBetween(edges, b, a));
+  assert.ok(!hasEdgeBetween(edges, { prompt: "billing-agent", fragment: "task" }, b));
 });

@@ -62,23 +62,38 @@ branches listed in IDEA.md instead of rewriting.
   - Gotcha: the `.mjs` CLI's tsx bridges must spawn from a package dir, not the repo
     root — the root has no `node_modules/.bin/tsx`. `tracing-cmd.mjs` still spawns
     from the root, so `uberprompt init|collect|tail` hits `Command "tsx" not found`.
-- [x] (felix — verified e2e on Mango, Aug 13) 4 — Semantic sync check: dependency graph walk after every apply → consistency proposals
-  - Full-chain e2e on the Mango Republic demo against live Atlas: DB wiped + reseeded
-    (6 prompts, 14 traces incl. 3 seeded failures) → lesson from failing refund traces →
-    `propose` filed 4 → `approve` refund-agent.refund-policy → v2 + snapshot + re-embed →
-    `uberprompt infer` found BOTH answer-key semantic edges (0.92 / 0.85–0.88, gpt-5-nano),
-    applied + pushed to `edges` collection → `sync-check refund-agent` walked the semantic
-    edge, judged escalation-writer.context INCONSISTENT, filed a `source:"sync-check"`
-    proposal → approved → escalation-writer v2 → wave-2 sync-check quiet. Loop closed.
-  - Bug found+fixed on the way: sync-check addressed a changed shared fragment as
-    `<prompt>.<key>` — a node no edge points at — so dependents were never found.
-    Now detects shared keys via `uses` edges and walks the bare shared node.
-  - Semantic edges reach Mongo via a manual insert for now — `infer` writes edges.json
-    only; wiring `infer --apply` to also upsert the `edges` collection is open.
+- [x] (felix + talwe+claude) 4 — Semantic sync check: `runSyncCheck`
+      (packages/cli/src/sync-check.mjs, extends felix's prototype) runs inline
+      after every successful approve bridge and rollback (function call, not a
+      watcher; `--no-sync` opts out) and manually via
+      `uberprompt sync-check <prompt[.fragment]>` (alias `sync`). Dependents =
+      Mongo `edges` graph walk (buildGraph/dependentsOf over a thin adapter,
+      shared-node aware) ∪ `$vectorSearch` discovery (cosine >= 0.80, top 5)
+      with new `kind:"semantic"` edges persisted straight into the `edges`
+      collection (confidence/model/inferredAt) — closes the "infer --apply
+      doesn't reach Mongo" gap for the sync path. gpt-5.1 consistency check
+      files `source:"sync-check"` proposals for real conflicts. Plus:
+      `uberprompt reembed` (embedding-space backfill + verify) and
+      `uberprompt rollback <prompt> [--to N]` — restores a snapshot as a new
+      version (append-only) and fires the sync check.
+  - (felix) Full-chain e2e on the Mango demo against live Atlas: reseed →
+    lesson → propose → approve refund-agent.refund-policy → infer found both
+    answer-key semantic edges → sync-check walked them, filed + approved the
+    escalation-writer.context fix → wave-2 quiet. Bug found+fixed: sync-check
+    now walks the bare shared-fragment node when a shared key changes.
 - [ ] (PARKED — backend first, per talwe) Dashboard: pipeline view of the 4 stages + graph + proposal inbox (salvage exists in stopped-agent worktrees)
 
 ## Demo
-- [ ] (talwe+claude — in progress) Wire end-to-end, dry-run the 4-min script in IDEA.md
+- [x] (talwe+claude — done) Wire end-to-end: LIVE convergence runs recorded
+      verbatim in `docs/DEMO-RUN.md` (feeds docs/DEMO.md's video). On the
+      Mango Republic crew: 4 waves to convergence, 6 semantic edges
+      discovered (incl. both planted answer-key deps at 0.868/0.862), 2 real
+      conflicts fixed, 1 false positive + 2 stale/redundant proposals stopped
+      at the human gate. NOTE: a reset/rehearsal loop restored the cluster to
+      pristine v1 at 23:04Z (proposals/lessons/semantic edges wiped) — that
+      is the intended pre-video state; the runs live on in DEMO-RUN.md.
+      Operational loop taught to any session via
+      `.claude/skills/sync-loop/SKILL.md`.
   - Stage 3 verified live (Aug 13): approved proposal `6a7e40ee…` for real —
     tech-support-agent v1→v2, fragment re-embedded, proposal `applied`. Full run +
     evidence in `docs/PIPELINE-TEST.md`.
@@ -89,8 +104,8 @@ branches listed in IDEA.md instead of rewriting.
     snapshot, LLM-checks dependents, files `source:"sync-check"` proposals.
     Ran live on the v2 bump: 0 declared dependents (correct), forced checks on
     the answer-key neighbors judged consistent — loop converges quiet in wave 1.
-  - Still open at the seam: chain sync-check onto approve; all embeddings
-    written before ~21:41Z Aug 13 (6 prompts + lesson 1) are orthogonal to the
-    current endpoint's space — semantic-edge discovery returns noise until
-    re-embedded; apps/demo JSON diverged from Mongo after the apply (files
-    still v1).
+  - Seam items above all closed by the stage-4 PR: sync check chained onto
+    approve (and rollback), IDEA.md states the function-call handoff,
+    `uberprompt reembed` repaired the split embedding space (verified
+    0.849/0.832 known-good pairs), and apps/demo JSON is officially seed-only
+    (Mongo canonical — no write-back).

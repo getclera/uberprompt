@@ -2,6 +2,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"];
+const VOYAGE_URL =
+  process.env.VOYAGE_EMBEDDINGS_URL || "https://ai.mongodb.com/v1/embeddings";
+const VOYAGE_MODEL = "voyage-3.5-lite";
 
 export function loadEnv(repoRoot) {
   const fileVals = {};
@@ -49,52 +52,67 @@ export async function parseObjectId(id) {
   return new ObjectId(id);
 }
 
-export async function openaiClient(env) {
-  const { default: OpenAI } = await import("openai");
-  return new OpenAI({ apiKey: env.OPENAI_API_KEY });
-}
-
-export async function structuredCall(client, model, prompt, tool) {
-  const resp = await client.chat.completions.create({
-    model,
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
-      },
-    ],
-    tool_choice: { type: "function", function: { name: tool.name } },
-    messages: [{ role: "user", content: prompt }],
-  });
-  const call = (resp.choices[0]?.message?.tool_calls || []).find(
-    (c) => c.function?.name === tool.name
-  );
-  if (!call) throw new Error(`model returned no ${tool.name} tool call`);
-  return JSON.parse(call.function.arguments);
-}
-
-export async function voyageEmbed(env, text) {
-  const url =
-    process.env.VOYAGE_EMBEDDINGS_URL || "https://ai.mongodb.com/v1/embeddings";
-  const res = await fetch(url, {
+export async function voyageEmbedBatch(env, texts) {
+  if (texts.length === 0) return [];
+  const res = await fetch(VOYAGE_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${env.VOYAGE_API_KEY}`,
     },
-    body: JSON.stringify({ model: "voyage-3.5-lite", input: [text] }),
+    body: JSON.stringify({ model: VOYAGE_MODEL, input: texts }),
   });
   if (!res.ok) {
-    throw new Error(`embeddings failed (${res.status}) at ${url}: ${await res.text()}`);
+    throw new Error(`voyage embed failed: ${res.status} ${await res.text()}`);
   }
-  const json = await res.json();
-  const vector = json.data?.[0]?.embedding;
-  if (!Array.isArray(vector)) throw new Error("embeddings response had no embedding");
-  return vector;
+  const body = await res.json();
+  const rows = body.data;
+  if (!Array.isArray(rows) || rows.length !== texts.length) {
+    throw new Error(
+      `voyage embed returned ${rows?.length ?? 0} embeddings for ${texts.length} inputs: ${JSON.stringify(body).slice(0, 200)}`
+    );
+  }
+  return rows.sort((a, b) => a.index - b.index).map((r) => r.embedding);
+}
+
+export async function voyageEmbed(env, text) {
+  const [embedding] = await voyageEmbedBatch(env, [text]);
+  if (!Array.isArray(embedding)) {
+    throw new Error("voyage embed returned no embedding");
+  }
+  return embedding;
+}
+
+export function cosine(a, b) {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export const VOYAGE_EMBED_MODEL = VOYAGE_MODEL;
+
+export async function openaiClient(env) {
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  return createOpenAI({ apiKey: env.OPENAI_API_KEY });
+}
+
+export async function structuredCall(provider, model, prompt, tool) {
+  const { generateText, Output, jsonSchema } = await import("ai");
+  const { output } = await generateText({
+    model: provider(model),
+    output: Output.object({ schema: jsonSchema(tool.parameters) }),
+    prompt: `${tool.description}\n\n${prompt}`,
+    telemetry: { functionId: `cli-${tool.name}` },
+  });
+  if (!output) throw new Error(`model returned no ${tool.name} output`);
+  return output;
 }
 
 export function truncate(text, max) {

@@ -18,11 +18,13 @@ const CATALOG_TOOL = {
     "Report which prompts from the catalog a production lesson applies to. Only name prompts whose instructions would actually change if the lesson were folded in.",
   parameters: {
     type: "object",
+    additionalProperties: false,
     properties: {
       prompts: {
         type: "array",
         items: {
           type: "object",
+          additionalProperties: false,
           properties: {
             name: { type: "string" },
             reason: { type: "string" },
@@ -42,11 +44,13 @@ function rewriteTool(keys) {
       "Propose the minimal fragment rewrites needed to fold a production lesson into a prompt. Return an empty list if the prompt already complies.",
     parameters: {
       type: "object",
+      additionalProperties: false,
       properties: {
         edits: {
           type: "array",
           items: {
             type: "object",
+            additionalProperties: false,
             properties: {
               fragment: { type: "string", enum: keys },
               newText: { type: "string" },
