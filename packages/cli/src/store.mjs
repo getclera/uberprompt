@@ -77,6 +77,26 @@ export async function structuredCall(client, model, prompt, tool) {
   return JSON.parse(call.function.arguments);
 }
 
+export async function voyageEmbed(env, text) {
+  const url =
+    process.env.VOYAGE_EMBEDDINGS_URL || "https://ai.mongodb.com/v1/embeddings";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${env.VOYAGE_API_KEY}`,
+    },
+    body: JSON.stringify({ model: "voyage-3.5-lite", input: [text] }),
+  });
+  if (!res.ok) {
+    throw new Error(`embeddings failed (${res.status}) at ${url}: ${await res.text()}`);
+  }
+  const json = await res.json();
+  const vector = json.data?.[0]?.embedding;
+  if (!Array.isArray(vector)) throw new Error("embeddings response had no embedding");
+  return vector;
+}
+
 export function truncate(text, max) {
   const flat = String(text).replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
