@@ -8,11 +8,11 @@ Claim = put your name in [ ] and push. One branch per task.
 
 ## Phase 1 — parallel build
 - [ ] (talwe/claude — in progress, bundled with Phase 0) A: SDK — definePrompt/fragments, deps, render, traced LLM call wrapper
-- [ ] (unclaimed) B: agent — change-stream listener + consistency loop (edit → ripple proposals)
-- [ ] (unclaimed) B2: agent — learning loop (traces → lessons → proposals)
-- [ ] (unclaimed) C: dashboard — prompt graph view + fragment editor
-- [ ] (unclaimed) C2: dashboard — proposal inbox (diff, approve/reject) + trace list
-- [ ] (unclaimed) D: demo app — recruiting-outreach prompts + seed script + failure traces
+- [ ] (claude agent — in progress) B: agent — change-stream listener + consistency loop (edit → ripple proposals)
+- [ ] (claude agent — in progress) B2: agent — learning loop (traces → lessons → proposals)
+- [ ] (claude agent — in progress) C: dashboard — prompt graph view + fragment editor
+- [ ] (claude agent — in progress) C2: dashboard — proposal inbox (diff, approve/reject) + trace list
+- [ ] (claude agent — in progress) D: demo app — recruiting-outreach prompts + seed script + failure traces
 
 ## Phase 2 — demo
 - [ ] (unclaimed) Wire full demo flow end-to-end, dry-run the 4-min script (IDEA.md)
