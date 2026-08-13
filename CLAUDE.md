@@ -89,8 +89,9 @@ talks to you. It should never be blocked grinding on a long task.
 TypeScript everywhere. pnpm monorepo: `packages/sdk`, `apps/web` (Next.js dashboard),
 `apps/agent` (sync agent), `apps/demo` (demo app that generates traces).
 MongoDB Atlas (one platform: documents + Atlas Vector Search + change streams).
-Embeddings: Voyage AI. LLM: Claude API (`@anthropic-ai/sdk`), model `claude-opus-5`,
-adaptive thinking (default — don't pass a `thinking` config or sampling params).
+Embeddings: Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite, 1024d).
+LLM: **OpenAI** (`openai` npm pkg, `OPENAI_API_KEY` in .env) — there is NO Anthropic
+key; don't write `@anthropic-ai/sdk` call paths. Backend first — dashboard is parked.
 
 ## Code standards (ported from clera-platform, hackathon-weight)
 
