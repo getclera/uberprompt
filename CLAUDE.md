@@ -61,7 +61,8 @@ If not, push the doc fix (doc-only fixes may go straight to main).
 - **NEVER force-push `main` — no exceptions, it overwrites teammates' code.**
   `--force-with-lease` is allowed only on your own feature branch (e.g. after a
   rebase), never on main, never on a branch someone else may be using.
-- Doc-only fixes may go straight to main (normal push).
+- **NEVER push directly to `main` — everything goes through a PR**, docs included.
+  Rebase your branch on origin/main, push the branch, open the PR, merge fast.
 - Secrets live in `.env` (gitignored). Never commit or print credential values.
 
 ## Keep the main session free — delegate everything heavy
