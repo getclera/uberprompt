@@ -6,46 +6,59 @@ import {
   miningPrompt,
   findDuplicate,
   learnPipeline,
-} from "../src/learn.mjs";
+} from "../src/learn.ts";
+import type { TraceDoc } from "../src/learn.ts";
+import type { Db, WithId } from "mongodb";
 
-function fakeDb(state) {
+interface FakeState {
+  finds: { name: string; filter: Record<string, unknown> }[];
+  sorts: Record<string, unknown>[];
+  limits: number[];
+  aggregates: { name: string; pipeline: Record<string, unknown>[] }[];
+  inserts: { name: string; doc: Record<string, unknown> }[];
+  updates: { name: string; filter: Record<string, unknown>; update: Record<string, unknown> }[];
+  findResults: unknown[][];
+  aggResults: unknown[][];
+}
+
+function fakeDb(state: FakeState): Db {
   return {
-    collection(name) {
+    collection(name: string) {
       return {
-        find(filter) {
+        find(filter: Record<string, unknown>) {
           state.finds.push({ name, filter });
           const results = state.findResults.shift() || [];
           return {
-            sort(spec) {
+            sort(spec: Record<string, unknown>) {
               state.sorts.push(spec);
               return this;
             },
-            limit(n) {
+            limit(n: number) {
               state.limits.push(n);
               return this;
             },
             toArray: async () => results,
           };
         },
-        aggregate(pipeline) {
+        aggregate(pipeline: Record<string, unknown>[]) {
           state.aggregates.push({ name, pipeline });
           const results = state.aggResults.shift() || [];
           return { toArray: async () => results };
         },
-        insertOne: async (doc) => {
+        insertOne: async (doc: Record<string, unknown>) => {
           state.inserts.push({ name, doc });
           return { insertedId: `inserted-${state.inserts.length}` };
         },
-        updateOne: async (filter, update) => {
+        updateOne: async (filter: Record<string, unknown>, update: Record<string, unknown>) => {
           state.updates.push({ name, filter, update });
           return { matchedCount: 1 };
         },
       };
     },
-  };
+  } as unknown as Db;
 }
 
-function newState(overrides = {}) {
+function newState(overrides: Partial<FakeState> = {}): FakeState {
   return {
     finds: [],
     sorts: [],
@@ -68,7 +81,7 @@ const badTrace = {
   output: "You will get $500 back.",
   error: "hallucinated refund amount",
   ts: new Date("2026-08-13T10:00:00Z"),
-};
+} as unknown as WithId<TraceDoc>;
 
 const okTrace = {
   _id: "t2",
@@ -79,17 +92,17 @@ const okTrace = {
   output: "Order confirmed.",
   score: 0.9,
   ts: new Date("2026-08-13T09:00:00Z"),
-};
+} as unknown as WithId<TraceDoc>;
 
 test("selectTraces requires a prompt binding and prioritizes error/low-score traces", async () => {
   const state = newState({ findResults: [[badTrace], [okTrace]] });
   const traces = await selectTraces(fakeDb(state), 10);
 
-  assert.deepEqual(state.finds[0].filter, {
+  assert.deepEqual(state.finds[0]!.filter, {
     promptName: { $exists: true },
     $or: [{ error: { $exists: true } }, { score: { $lt: 0.5 } }],
   });
-  assert.deepEqual(state.finds[1].filter, {
+  assert.deepEqual(state.finds[1]!.filter, {
     promptName: { $exists: true },
     _id: { $nin: ["t1"] },
   });
@@ -106,9 +119,9 @@ test("selectTraces stops at the limit when signal traces fill it", async () => {
 });
 
 test("groupByPrompt groups traces by promptName", () => {
-  const groups = groupByPrompt([badTrace, okTrace, { ...badTrace, _id: "t3" }]);
+  const groups = groupByPrompt([badTrace, okTrace, { ...badTrace, _id: "t3" } as unknown as WithId<TraceDoc>]);
   assert.deepEqual([...groups.keys()], ["refund-agent", "order-agent"]);
-  assert.deepEqual(groups.get("refund-agent").map((t) => t._id), ["t1", "t3"]);
+  assert.deepEqual(groups.get("refund-agent")!.map((t) => t._id), ["t1", "t3"]);
 });
 
 test("miningPrompt includes trace signal and permits zero lessons", () => {
@@ -128,8 +141,8 @@ test("findDuplicate matches only active lessons and applies the threshold", asyn
     ],
   });
   const hit = await findDuplicate(fakeDb(state), [0.1, 0.2], 0.92);
-  assert.equal(hit._id, "l1");
-  const search = state.aggregates[0].pipeline[0].$vectorSearch;
+  assert.equal(hit!._id, "l1");
+  const search = (state.aggregates[0]!.pipeline[0] as { $vectorSearch: Record<string, unknown> }).$vectorSearch;
   assert.equal(search.index, "lessons_embedding");
   assert.equal("filter" in search, false);
 
@@ -154,7 +167,7 @@ test("learnPipeline inserts a new lesson with the contract shape", async () => {
 
   assert.deepEqual(result, { traces: 1, mined: 1, inserted: 1, merged: 0 });
   assert.equal(state.inserts.length, 1);
-  const { name, doc } = state.inserts[0];
+  const { name, doc } = state.inserts[0]!;
   assert.equal(name, "lessons");
   assert.equal(doc.text, "never promise a refund amount");
   assert.equal(doc.reason, "traces hallucinated amounts");
@@ -183,8 +196,8 @@ test("learnPipeline merges into a near-duplicate instead of inserting", async ()
   assert.deepEqual(result, { traces: 1, mined: 1, inserted: 0, merged: 1 });
   assert.equal(state.inserts.length, 0);
   assert.equal(state.updates.length, 1);
-  assert.deepEqual(state.updates[0].filter, { _id: "l1" });
-  assert.deepEqual(state.updates[0].update, {
+  assert.deepEqual(state.updates[0]!.filter, { _id: "l1" });
+  assert.deepEqual(state.updates[0]!.update, {
     $addToSet: {
       sourceTraceIds: { $each: ["t1"] },
       appliesTo: "refund-agent",

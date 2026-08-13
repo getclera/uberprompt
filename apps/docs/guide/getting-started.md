@@ -36,7 +36,7 @@ This creates the `spans` collection and a unique index on `traces.traceId` that 
 Load the demo prompts, fragments, edges, and seed traces:
 
 ```bash
-pnpm --filter demo exec node seed.mjs
+pnpm --filter demo exec node seed.ts
 ```
 
 ## Start collecting traces

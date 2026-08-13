@@ -1,8 +1,12 @@
-import { loadEnv, requireEnv, connect } from "./store.mjs";
+import { loadEnv, requireEnv, connect } from "./store.ts";
+import type { CliOpts, ProposalDoc } from "./types.ts";
 
 const CONTEXT_WORDS = 5;
 
-export function compactDiff(oldText, newText) {
+export function compactDiff(
+  oldText: string,
+  newText: string
+): { removed: string; added: string } {
   const a = oldText.split(/\s+/).filter(Boolean);
   const b = newText.split(/\s+/).filter(Boolean);
   let prefix = 0;
@@ -21,12 +25,12 @@ export function compactDiff(oldText, newText) {
   const newMid = b.slice(prefix, b.length - suffix).join(" ");
   const preEll = prefix > CONTEXT_WORDS ? "… " : "";
   const postEll = a.length - suffix + CONTEXT_WORDS < a.length ? " …" : "";
-  const wrap = (mid) =>
+  const wrap = (mid: string) =>
     `${preEll}${pre}${pre ? " " : ""}[${mid || "∅"}]${post ? " " : ""}${post}${postEll}`;
   return { removed: wrap(oldMid), added: wrap(newMid) };
 }
 
-function renderProposal(p) {
+function renderProposal(p: ProposalDoc): void {
   const target = p.target.fragment
     ? `${p.target.prompt}.${p.target.fragment}`
     : p.target.prompt;
@@ -40,13 +44,13 @@ function renderProposal(p) {
   console.log(`  + ${added}`);
 }
 
-export async function runProposals(repoRoot, opts) {
+export async function runProposals(repoRoot: string, opts: CliOpts): Promise<number> {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB"]);
   const { client, db } = await connect(env);
   try {
     const filter = opts.all ? {} : { status: "pending" };
-    const docs = await db.collection("proposals").find(filter).sort({ ts: 1 }).toArray();
+    const docs = await db.collection<ProposalDoc>("proposals").find(filter).sort({ ts: 1 }).toArray();
     if (docs.length === 0) {
       console.log(opts.all ? "No proposals." : "No pending proposals.");
       return 0;

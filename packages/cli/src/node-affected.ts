@@ -2,10 +2,17 @@
 // prompt.fragment, report what depends on it (downstream, affected when it
 // changes) and what it depends on (upstream), with the backing files.
 import { relative, join } from "node:path";
-import { buildGraph, dependentsOf, dependenciesOf } from "./graph.mjs";
+import { buildGraph, dependentsOf, dependenciesOf } from "./graph.ts";
+import type { CliOpts, DepEntry, Model } from "./types.ts";
+
+interface Resolved {
+  node?: string;
+  error?: string;
+  suggestions?: string[];
+}
 
 // Map a graph node to its backing file (repo-relative).
-export function nodeFile(model, repoRoot, node) {
+export function nodeFile(model: Model, repoRoot: string, node: string): string | null {
   const dot = node.indexOf(".");
   const head = dot === -1 ? node : node.slice(0, dot);
   let abs;
@@ -16,7 +23,7 @@ export function nodeFile(model, repoRoot, node) {
 }
 
 // Resolve user input to a node id; returns { node } or { error, suggestions }.
-export function resolveNode(model, input) {
+export function resolveNode(model: Model, input: string): Resolved {
   if (model.prompts.has(input) || model.fragments.has(input)) return { node: input };
   const dot = input.indexOf(".");
   if (dot !== -1) {
@@ -36,16 +43,21 @@ export function resolveNode(model, input) {
   return { error: `unknown prompt or fragment: "${input}"`, suggestions };
 }
 
-export function runNodeAffected(model, repoRoot, input, opts) {
+export function runNodeAffected(
+  model: Model,
+  repoRoot: string,
+  input: string,
+  opts: CliOpts
+): number {
   const res = resolveNode(model, input);
   if (res.error) {
     console.error(res.error);
-    if (res.suggestions.length) console.error(`did you mean: ${res.suggestions.join(", ")}`);
+    if (res.suggestions!.length) console.error(`did you mean: ${res.suggestions!.join(", ")}`);
     return 1;
   }
-  const node = res.node;
+  const node = res.node!;
   const graph = buildGraph(model);
-  const decorate = (e) => ({ ...e, file: nodeFile(model, repoRoot, e.node) });
+  const decorate = (e: DepEntry) => ({ ...e, file: nodeFile(model, repoRoot, e.node) });
   const affected = dependentsOf(graph, node).map(decorate);
   const dependsOn = dependenciesOf(graph, node).map(decorate);
 

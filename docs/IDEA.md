@@ -55,7 +55,7 @@ lesson without getting better must not clear the gate.
 `packages/sdk/src/prompt.ts` (version bump + `contentHash` + re-embed + new-version
 `prompt_versions` snapshot + `status: "applied"`, all in one transaction).
 `uberprompt approve` bridges to it via `packages/sdk/scripts/approve.ts`; the old
-duplicate logic in `packages/cli/src/review.mjs` is gone.
+duplicate logic in `packages/cli/src/review.ts` is gone.
 
 **Stage 3→4 handoff (DECIDED, shipped):** stage 4 is a function call, not a
 watcher — after a successful approve bridge (and after `rollback`), the CLI
@@ -70,7 +70,7 @@ per prompt (one approval = one version bump). Apply does NOT walk dependencies �
 that's stage 4, triggered by the version bump.
 
 ### 4. Semantic sync check (needs the dependency graph) — SHIPPED
-ONE shared mechanism (`runSyncCheck` in packages/cli/src/sync-check.mjs),
+ONE shared mechanism (`runSyncCheck` in packages/cli/src/sync-check.ts),
 invoked as a function call at the end of every version bump (approve,
 rollback, or a manual `uberprompt sync-check`) — NOT a change-stream watcher:
 1. Collect dependents via a graph walk over the Mongo `edges` collection
@@ -320,8 +320,8 @@ packages/cli       existing CLI (felix: infer / affected / graph) — stage 1 ad
 
 `tracing` depends on `sdk`; `cli` depends on `tracing`; nothing depends on `cli`. Keeping
 ingestion out of `packages/sdk` is deliberate — it keeps stage 1 off the file stage 3 edits.
-Note that `packages/cli` is currently plain `.mjs` while the stack is otherwise TypeScript;
-stage 1's subcommands stay thin so the language boundary sits at the CLI edge only.
+`packages/cli` is TypeScript like the rest of the stack, run directly by Node's native
+type stripping (`node bin/uberprompt.ts`, Node >= 23.6) — no build step, no tsx dependency.
 
 ### Interfaces between stages
 

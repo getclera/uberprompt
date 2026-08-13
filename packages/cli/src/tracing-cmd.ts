@@ -1,23 +1,33 @@
-// Bridges the .mjs CLI to the TypeScript ingestion core in packages/tracing.
+// Bridges the CLI to the TypeScript ingestion core in packages/tracing.
 // The core stays TS (it shares contract types with the SDK); tsx runs it in-process
 // so `uberprompt init|collect|tail` behaves like any other subcommand.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { CliOpts } from "./types.ts";
 
-const SCRIPTS = { init: "init.ts", collect: "collect.ts", tail: "tail.ts", compare: "compare.ts" };
+const SCRIPTS: Record<string, string> = {
+  init: "init.ts",
+  collect: "collect.ts",
+  tail: "tail.ts",
+  compare: "compare.ts",
+};
 
 // The workspace is found from this file's own location, not from cwd: the CLI is
 // installed as a bin and is routinely run from outside the repo, where the caller's
 // git-based repoRoot() falls back to cwd and resolves the wrong path.
-function workspaceRoot(fallback) {
+function workspaceRoot(fallback: string): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidate = resolve(here, "..", "..", "..");
   return existsSync(join(candidate, "packages", "tracing")) ? candidate : fallback;
 }
 
-export function runTracing(command, cliRoot, opts) {
+export function runTracing(
+  command: string,
+  cliRoot: string,
+  opts: CliOpts
+): number | Promise<number> {
   const script = SCRIPTS[command];
   if (!script) throw new Error(`unknown tracing command: ${command}`);
 
@@ -39,12 +49,12 @@ export function runTracing(command, cliRoot, opts) {
   if (existsSync(envFile)) args.push(`--env-file=${envFile}`);
   args.push(entry);
 
-  return new Promise((resolve) => {
+  return new Promise<number>((done) => {
     const child = spawn("pnpm", ["exec", ...args], { cwd: root, stdio: "inherit", env });
-    child.on("exit", (code) => resolve(code ?? 0));
+    child.on("exit", (code) => done(code ?? 0));
     child.on("error", (err) => {
       console.error(`failed to start: ${err.message}`);
-      resolve(1);
+      done(1);
     });
   });
 }

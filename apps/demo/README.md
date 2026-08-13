@@ -91,8 +91,8 @@ it via fragment similarity, and flag drift when the shared source changes.
 Scripted, reversible edits for the stage demo live in `scenarios/`:
 
 ```
-node apps/demo/scenarios/apply.mjs raise-escalation-threshold          # apply
-node apps/demo/scenarios/apply.mjs raise-escalation-threshold --revert # undo
+node apps/demo/scenarios/apply.ts raise-escalation-threshold          # apply
+node apps/demo/scenarios/apply.ts raise-escalation-threshold --revert # undo
 ```
 
 `raise-escalation-threshold` bumps the churn-risk threshold in

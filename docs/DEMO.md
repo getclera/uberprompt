@@ -23,7 +23,7 @@ Three prepped tmux panes: **A** = commands, **B** = `uberprompt tail` (live trac
 | t | Action (pane) | Say |
 |---|---|---|
 | 0:00 | A: `uberprompt graph` (already on screen) | "Six support agents of a mango wholesaler, four shared prompt fragments. These are the *declared* dependencies." |
-| 0:10 | A: `node apps/demo/scenarios/apply.mjs raise-escalation-threshold` + reseed | "Business decision: only escalate churn on accounts above $100k, was $50k. We edit the shared escalation policy." |
+| 0:10 | A: `node apps/demo/scenarios/apply.ts raise-escalation-threshold` + reseed | "Business decision: only escalate churn on accounts above $100k, was $50k. We edit the shared escalation policy." |
 | 0:20 | C: run FreshMart probe ticket ($70k churn risk) | "This $70k cancellation ticket should now be a normal sales conversation — but the router still escalates it. Why? It *paraphrased* the old policy; no declared edge." |
 | 0:30 | A: `uberprompt sync-check <prompt>` | "Sync agent embeds the changed fragment, vector-searches every other fragment in Atlas — finds the paraphrase, files a fix proposal." |
 | 0:45 | A: `uberprompt proposals` + `uberprompt approve <id>` | "Here's the minimal diff on the router's routing rules. Approve — version bump, snapshot, re-embed." |
@@ -34,10 +34,10 @@ retake, so the reset script (task 5) is the critical piece.
 
 ## Setup status
 
-- Probe runner: `node apps/demo/scenarios/run-ticket.mjs` — loads triage-router
+- Probe runner: `node apps/demo/scenarios/run-ticket.ts` — loads triage-router
   from Mongo, calls gpt-5.1, prints lane. Verified: FreshMart $70k ticket →
   `escalation` (confidence 0.97) on v1 state, ~1.3s.
-- Reset: `node apps/demo/scenarios/reset.mjs` — reverts scenario file edits,
+- Reset: `node apps/demo/scenarios/reset.ts` — reverts scenario file edits,
   wipes demo collections, reseeds v1 prompts/edges/traces. Verified live.
 - Still open: mid-part rehearsal (scenario apply → push v2 to Mongo with
   prompt_versions snapshot → `uberprompt sync-check` finds the routing-rules

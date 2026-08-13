@@ -45,7 +45,7 @@ function revertScenarios() {
     const scenarioPath = join(scenariosDir, name, "scenario.json");
     if (!existsSync(scenarioPath)) continue;
     try {
-      execFileSync("node", [join(scenariosDir, "apply.mjs"), name, "--revert"], {
+      execFileSync("node", [join(scenariosDir, "apply.ts"), name, "--revert"], {
         stdio: ["ignore", "ignore", "ignore"],
       });
       console.log(`reverted scenario file edits: ${name}`);

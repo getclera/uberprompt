@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const bin = join(here, "..", "bin", "uberprompt.mjs");
+const bin = join(here, "..", "bin", "uberprompt.ts");
 const demoDir = join(here, "..", "..", "..", "apps", "demo");
 
-function run(args) {
+function run(args: string[]): string {
   return execFileSync("node", [bin, ...args, "--dir", demoDir], {
     encoding: "utf8",
   });
@@ -36,7 +36,7 @@ test("graph <fragment> renders the impact tree", () => {
 });
 
 test("graph --json emits dependents per shared fragment", () => {
-  const parsed = JSON.parse(run(["graph", "--json"]));
+  const parsed = JSON.parse(run(["graph", "--json"])) as { nodes: { node: string }[] };
   const keys = parsed.nodes.map((n) => n.node);
   assert.deepEqual(keys, [
     "brand-voice",
@@ -49,10 +49,11 @@ test("graph --json emits dependents per shared fragment", () => {
 test("graph rejects unknown nodes with the known-node list", () => {
   assert.throws(
     () => run(["graph", "nope"]),
-    (err) => {
-      assert.equal(err.status, 1);
-      assert.match(err.stderr, /unknown node: nope/);
-      assert.match(err.stderr, /known nodes:/);
+    (err: unknown) => {
+      const e = err as { status: number; stderr: string };
+      assert.equal(e.status, 1);
+      assert.match(e.stderr, /unknown node: nope/);
+      assert.match(e.stderr, /known nodes:/);
       return true;
     }
   );

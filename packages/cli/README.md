@@ -15,7 +15,7 @@ npm install
 Then run it directly:
 
 ```sh
-node packages/cli/bin/uberprompt.mjs <command>
+node packages/cli/bin/uberprompt.ts <command>
 ```
 
 or link it globally (from `packages/cli`):
@@ -87,25 +87,25 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
 
 ```sh
 # 1. Raise the churn threshold $5k -> $10k in the shared escalation-criteria.
-node apps/demo/scenarios/apply.mjs raise-escalation-threshold
+node apps/demo/scenarios/apply.ts raise-escalation-threshold
 
 # 2. The declared graph only reaches escalation-writer.
-node packages/cli/bin/uberprompt.mjs affected
+node packages/cli/bin/uberprompt.ts affected
 #   changed: escalation-criteria
 #     -> escalation-writer  [uses]
 
 # 3. Infer discovers that triage-router's local routing-rules paraphrases the
 #    same threshold, and adds the semantic edge.
-node packages/cli/bin/uberprompt.mjs infer --apply
+node packages/cli/bin/uberprompt.ts infer --apply
 #   Applied 1 semantic edge(s): triage-router.routing-rules -> escalation-criteria
 
 # 4. affected now also flags triage-router (via the inferred edge).
-node packages/cli/bin/uberprompt.mjs affected
+node packages/cli/bin/uberprompt.ts affected
 #   changed: escalation-criteria
 #     -> escalation-writer            [uses]
 #     -> triage-router.routing-rules  [semantic] ⚠
 #     -> triage-router                [contains]
 
 # revert when done
-node apps/demo/scenarios/apply.mjs raise-escalation-threshold --revert
+node apps/demo/scenarios/apply.ts raise-escalation-threshold --revert
 ```

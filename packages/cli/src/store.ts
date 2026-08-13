@@ -1,34 +1,39 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import type { Db, MongoClient, ObjectId } from "mongodb";
+import type { createOpenAI } from "@ai-sdk/openai";
+import type { CliEnv, Tool } from "./types.ts";
 
-const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"];
+export type OpenAIProvider = ReturnType<typeof createOpenAI>;
+
+const ENV_KEYS = ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"] as const;
 const VOYAGE_URL =
   process.env.VOYAGE_EMBEDDINGS_URL || "https://ai.mongodb.com/v1/embeddings";
 const VOYAGE_MODEL = "voyage-3.5-lite";
 
-export function loadEnv(repoRoot) {
-  const fileVals = {};
+export function loadEnv(repoRoot: string): CliEnv {
+  const fileVals: Record<string, string> = {};
   const envPath = join(repoRoot, ".env");
   if (existsSync(envPath)) {
     for (const line of readFileSync(envPath, "utf8").split("\n")) {
       const m = line.match(/^\s*(?:export\s+)?([A-Z_]+)\s*=\s*(.+?)\s*$/);
       if (!m) continue;
-      let v = m[2];
+      let v = m[2]!;
       if (
         (v.startsWith('"') && v.endsWith('"')) ||
         (v.startsWith("'") && v.endsWith("'"))
       ) {
         v = v.slice(1, -1);
       }
-      fileVals[m[1]] = v;
+      fileVals[m[1]!] = v;
     }
   }
-  const env = {};
+  const env = {} as CliEnv;
   for (const k of ENV_KEYS) env[k] = process.env[k] || fileVals[k] || null;
   return env;
 }
 
-export function requireEnv(env, keys) {
+export function requireEnv(env: CliEnv, keys: (keyof CliEnv)[]): void {
   const missing = keys.filter((k) => !env[k]);
   if (missing.length) {
     throw new Error(
@@ -37,14 +42,14 @@ export function requireEnv(env, keys) {
   }
 }
 
-export async function connect(env) {
+export async function connect(env: CliEnv): Promise<{ client: MongoClient; db: Db }> {
   const { MongoClient } = await import("mongodb");
-  const client = new MongoClient(env.MONGODB_URI);
+  const client = new MongoClient(env.MONGODB_URI!);
   await client.connect();
-  return { client, db: client.db(env.MONGODB_DB) };
+  return { client, db: client.db(env.MONGODB_DB!) };
 }
 
-export async function parseObjectId(id) {
+export async function parseObjectId(id: string | undefined): Promise<ObjectId> {
   const { ObjectId } = await import("mongodb");
   if (!id || !ObjectId.isValid(id)) {
     throw new Error(`"${id}" is not a valid proposal id`);
@@ -52,7 +57,7 @@ export async function parseObjectId(id) {
   return new ObjectId(id);
 }
 
-export async function voyageEmbedBatch(env, texts) {
+export async function voyageEmbedBatch(env: CliEnv, texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
   const res = await fetch(VOYAGE_URL, {
     method: "POST",
@@ -65,7 +70,7 @@ export async function voyageEmbedBatch(env, texts) {
   if (!res.ok) {
     throw new Error(`voyage embed failed: ${res.status} ${await res.text()}`);
   }
-  const body = await res.json();
+  const body = (await res.json()) as { data?: { index: number; embedding: number[] }[] };
   const rows = body.data;
   if (!Array.isArray(rows) || rows.length !== texts.length) {
     throw new Error(
@@ -75,7 +80,7 @@ export async function voyageEmbedBatch(env, texts) {
   return rows.sort((a, b) => a.index - b.index).map((r) => r.embedding);
 }
 
-export async function voyageEmbed(env, text) {
+export async function voyageEmbed(env: CliEnv, text: string): Promise<number[]> {
   const [embedding] = await voyageEmbedBatch(env, [text]);
   if (!Array.isArray(embedding)) {
     throw new Error("voyage embed returned no embedding");
@@ -83,14 +88,14 @@ export async function voyageEmbed(env, text) {
   return embedding;
 }
 
-export function cosine(a, b) {
+export function cosine(a: number[], b: number[]): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
+    dot += a[i]! * b[i]!;
+    na += a[i]! * a[i]!;
+    nb += b[i]! * b[i]!;
   }
   const denom = Math.sqrt(na) * Math.sqrt(nb);
   return denom === 0 ? 0 : dot / denom;
@@ -98,16 +103,21 @@ export function cosine(a, b) {
 
 export const VOYAGE_EMBED_MODEL = VOYAGE_MODEL;
 
-export async function openaiClient(env) {
+export async function openaiClient(env: CliEnv): Promise<OpenAIProvider> {
   const { createOpenAI } = await import("@ai-sdk/openai");
-  return createOpenAI({ apiKey: env.OPENAI_API_KEY });
+  return createOpenAI({ apiKey: env.OPENAI_API_KEY! });
 }
 
-export async function structuredCall(provider, model, prompt, tool) {
+export async function structuredCall<T = Record<string, unknown>>(
+  provider: OpenAIProvider,
+  model: string,
+  prompt: string,
+  tool: Tool
+): Promise<T> {
   const { generateText, Output, jsonSchema } = await import("ai");
   const { output } = await generateText({
     model: provider(model),
-    output: Output.object({ schema: jsonSchema(tool.parameters) }),
+    output: Output.object({ schema: jsonSchema<T>(tool.parameters) }),
     prompt: `${tool.description}\n\n${prompt}`,
     telemetry: { functionId: `cli-${tool.name}` },
   });
@@ -115,7 +125,7 @@ export async function structuredCall(provider, model, prompt, tool) {
   return output;
 }
 
-export function truncate(text, max) {
+export function truncate(text: unknown, max: number): string {
   const flat = String(text).replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
 }

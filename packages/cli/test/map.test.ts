@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderMap } from "../src/map.mjs";
+import { renderMap } from "../src/map.ts";
 
 function fixtureModel() {
   const fragments = new Map([

@@ -19,7 +19,7 @@ The driver is a workspace dependency; it resolves in any checkout where `pnpm in
 so `mongodb` resolves, e.g. `packages/sdk`:
 
 ```js
-// query.mjs — run with: node query.mjs (from a directory where `mongodb` resolves)
+// query.ts — run with: node query.ts (from a directory where `mongodb` resolves)
 import { MongoClient } from 'mongodb';
 import { readFileSync } from 'fs';
 

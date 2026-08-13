@@ -6,14 +6,39 @@ import {
   structuredCall,
   voyageEmbed,
   truncate,
-} from "./store.mjs";
+} from "./store.ts";
+import type { Db, ObjectId, WithId } from "mongodb";
+import type { CliOpts, Tool } from "./types.ts";
+
+export interface TraceDoc {
+  promptName?: string;
+  promptVersion?: number;
+  traceId?: string;
+  error?: string;
+  score?: number;
+  input?: unknown;
+  output?: unknown;
+  ts?: Date;
+}
+
+interface MinedLesson {
+  text: string;
+  reason: string;
+}
+
+interface DuplicateHit {
+  _id: ObjectId;
+  text: string;
+  status?: string;
+  score: number;
+}
 
 const DEFAULT_MODEL = "gpt-5.1";
 const DEFAULT_LIMIT = 100;
 const DEFAULT_DEDUP_THRESHOLD = 0.92;
 const SNIPPET_MAX = 400;
 
-const LESSONS_TOOL = {
+const LESSONS_TOOL: Tool = {
   name: "report_lessons",
   description:
     "Report durable, generalizable lessons mined from production LLM traces of one prompt. Report an empty list when the traces show nothing recurring worth remembering.",
@@ -36,9 +61,9 @@ const LESSONS_TOOL = {
   },
 };
 
-export async function selectTraces(db, limit) {
+export async function selectTraces(db: Db, limit: number): Promise<WithId<TraceDoc>[]> {
   const signal = await db
-    .collection("traces")
+    .collection<TraceDoc>("traces")
     .find({
       promptName: { $exists: true },
       $or: [{ error: { $exists: true } }, { score: { $lt: 0.5 } }],
@@ -49,7 +74,7 @@ export async function selectTraces(db, limit) {
   const remaining = limit - signal.length;
   if (remaining <= 0) return signal;
   const rest = await db
-    .collection("traces")
+    .collection<TraceDoc>("traces")
     .find({
       promptName: { $exists: true },
       _id: { $nin: signal.map((t) => t._id) },
@@ -60,16 +85,18 @@ export async function selectTraces(db, limit) {
   return [...signal, ...rest];
 }
 
-export function groupByPrompt(traces) {
-  const groups = new Map();
+export function groupByPrompt(traces: WithId<TraceDoc>[]): Map<string, WithId<TraceDoc>[]> {
+  const groups = new Map<string, WithId<TraceDoc>[]>();
   for (const trace of traces) {
-    if (!groups.has(trace.promptName)) groups.set(trace.promptName, []);
-    groups.get(trace.promptName).push(trace);
+    const name = trace.promptName;
+    if (!name) continue;
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name)!.push(trace);
   }
   return groups;
 }
 
-function traceListing(traces) {
+function traceListing(traces: WithId<TraceDoc>[]): string {
   return traces
     .map((t) => {
       const lines = [`- trace ${t.traceId || t._id} (prompt v${t.promptVersion ?? "?"})`];
@@ -82,7 +109,7 @@ function traceListing(traces) {
     .join("\n");
 }
 
-export function miningPrompt(promptName, traces) {
+export function miningPrompt(promptName: string, traces: WithId<TraceDoc>[]): string {
   return (
     `Production traces of the LLM prompt "${promptName}" are listed below. ` +
     "Mine durable, generalizable lessons about what is going wrong or recurring — " +
@@ -94,10 +121,14 @@ export function miningPrompt(promptName, traces) {
   );
 }
 
-export async function findDuplicate(db, embedding, threshold) {
+export async function findDuplicate(
+  db: Db,
+  embedding: number[],
+  threshold: number
+): Promise<DuplicateHit | null> {
   const hits = await db
     .collection("lessons")
-    .aggregate([
+    .aggregate<DuplicateHit>([
       {
         $vectorSearch: {
           index: "lessons_embedding",
@@ -114,7 +145,21 @@ export async function findDuplicate(db, embedding, threshold) {
   return top && top.score >= threshold ? top : null;
 }
 
-export async function learnPipeline({ db, structured, embed, limit, threshold, dryRun }) {
+export async function learnPipeline({
+  db,
+  structured,
+  embed,
+  limit,
+  threshold,
+  dryRun,
+}: {
+  db: Db;
+  structured: (prompt: string, tool: Tool) => Promise<{ lessons?: MinedLesson[] }>;
+  embed: (text: string) => Promise<number[]>;
+  limit: number;
+  threshold: number;
+  dryRun: boolean;
+}): Promise<{ traces: number; mined: number; inserted: number; merged: number }> {
   const traces = await selectTraces(db, limit);
   const groups = groupByPrompt(traces);
   if (traces.length === 0) console.log("No traces with a prompt binding.");
@@ -178,7 +223,7 @@ export async function learnPipeline({ db, structured, embed, limit, threshold, d
   return { traces: traces.length, mined, inserted, merged };
 }
 
-export async function runLearn(repoRoot, opts) {
+export async function runLearn(repoRoot: string, opts: CliOpts): Promise<number> {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "OPENAI_API_KEY", "VOYAGE_API_KEY"]);
   const model = opts.model || DEFAULT_MODEL;
