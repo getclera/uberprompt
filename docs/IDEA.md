@@ -26,16 +26,37 @@ An agent consumes trace batches and mines what's going wrong / recurring. Output
 **lessons** — durable, embedded memory entries, vector-deduped against existing
 lessons. Lessons are knowledge, not yet action.
 
-### 3. Apply to prompts
+### 3. Apply to prompts (owner: talwe)
 Lessons (or a human edit in the dashboard) become concrete changes:
 proposal → approval → new prompt version. The only stage that mutates prompts;
-every mutation is versioned.
+every mutation is versioned (bump + snapshot + re-embed changed fragments).
+
+**Targeting ladder** — where does a lesson belong? (in order, no RAG needed today):
+1. **Lineage**: the prompt(s) whose traces produced the lesson (`lesson.appliesTo`).
+   Ground truth, works even when the concept is absent from the prompt text.
+2. **Catalog reasoning**: LLM reads the full prompt catalog (name, purpose
+   description, template, fragment keys) and picks other prompts the lesson
+   applies to. Full recall at our scale (<50 prompts); no embedding blind spot.
+3. **RAG** (only if the catalog ever outgrows context): vector search over
+   embedded *purpose descriptions*, not literal prompt text. Skip for hackathon.
+
+Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
+per prompt (one approval = one version bump). Apply does NOT walk dependencies —
+that's stage 4, triggered by the version bump.
 
 ### 4. Semantic sync check (needs the dependency graph)
-After every apply, walk the graph — declared `uses` edges + discovered semantic
-edges (vector similarity between fragments) — and check each dependent: "still
-consistent with what just changed?" Inconsistencies produce new proposals, which
-flow back through stage 3. Loop until the graph is quiet.
+ONE shared mechanism, built once, fired on every version bump (from any source —
+lesson apply, human edit, or a prior sync-check apply):
+1. Collect dependents via declared `uses` edges.
+2. Collect undeclared dependents via vector search: changed fragment's embedding
+   vs all other fragment embeddings (existing-text vs existing-text — the
+   absent-concept problem can't occur here). Insert `kind:"semantic"` edges found.
+3. LLM checks each dependent fragment for contradiction with the change; minimal
+   rewrite → consistency proposal → back through stage 3.
+4. Waves repeat, shrinking, until the graph is quiet.
+
+Division of labor: targeting answers "where does this *lesson* belong?"; sync
+check answers "what did this *edit* break?". Both emit proposals.
 
 Open questions (default in parens): stage-2 trigger — continuous or on-demand
 button (on-demand for the demo); dashboard shows the 4 stages as an explicit
