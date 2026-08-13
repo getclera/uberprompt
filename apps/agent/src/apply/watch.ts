@@ -1,24 +1,8 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { lessonsCol, watchLessons, type LessonDoc } from "@uberprompt/sdk";
+import type { ObjectId } from "mongodb";
+import { lessonsCol, watchLessonsResumable, type LessonDoc, type LessonWatcher } from "@uberprompt/sdk";
 import { applyLesson } from "./index";
 
-export const DEFAULT_TOKEN_PATH = ".uberprompt/stage3-resume-token.json";
-
-export function readResumeToken(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-}
-
-export function writeResumeToken(path: string, token: unknown): void {
-  if (token === undefined) return;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(token));
-}
+export const WATCHER_NAME = "stage3-apply";
 
 export async function backlog(): Promise<LessonDoc[]> {
   return lessonsCol()
@@ -27,19 +11,10 @@ export async function backlog(): Promise<LessonDoc[]> {
 }
 
 export interface WatchOptions {
-  tokenPath?: string;
   drainBacklog?: boolean;
 }
 
 export async function watch(opts: WatchOptions = {}): Promise<() => Promise<void>> {
-  const tokenPath = opts.tokenPath ?? DEFAULT_TOKEN_PATH;
-  const resumeAfter = readResumeToken(tokenPath);
-  console.log(
-    resumeAfter
-      ? `resuming lessons change stream from stored token (${tokenPath})`
-      : "no stored token — starting a fresh lessons change stream",
-  );
-
   if (opts.drainBacklog !== false) {
     const pending = await backlog();
     console.log(`backlog: ${pending.length} unprocessed lesson(s)`);
@@ -48,21 +23,17 @@ export async function watch(opts: WatchOptions = {}): Promise<() => Promise<void
     }
   }
 
-  const watcher = watchLessons(async (lesson, token) => {
+  const watcher: LessonWatcher = await watchLessonsResumable(WATCHER_NAME, async (lesson) => {
     if (!lesson._id) return;
     console.log(`lesson ${lesson._id.toHexString()} inserted`);
     await run(lesson._id);
-    writeResumeToken(tokenPath, token);
-  }, resumeAfter !== undefined ? { resumeAfter } : {});
+  });
 
-  console.log("watching lessons — stage 3 will file proposals as they arrive");
-  return async () => {
-    writeResumeToken(tokenPath, watcher.resumeToken());
-    await watcher.close();
-  };
+  console.log(`watching lessons as "${WATCHER_NAME}" — stage 3 will file proposals as they arrive`);
+  return () => watcher.close();
 }
 
-async function run(lessonId: import("mongodb").ObjectId): Promise<void> {
+async function run(lessonId: ObjectId): Promise<void> {
   try {
     const result = await applyLesson(lessonId);
     for (const outcome of result.outcomes) {
