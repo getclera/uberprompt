@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "smoke": "tsx --env-file=../../.env scripts/smoke.ts",
     "smoke:otlp": "tsx --env-file=../../.env scripts/smoke-otlp.ts",
-    "smoke:live": "tsx --env-file=../../.env scripts/smoke-live.ts"
+    "smoke:live": "tsx --env-file=../../.env scripts/smoke-live.ts",
+    "smoke:stream-error": "tsx --env-file=../../.env scripts/smoke-stream-error.ts"
   },
   "dependencies": {
     "@ai-sdk/otel": "^1.0.65",
