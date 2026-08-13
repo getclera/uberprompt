@@ -18,7 +18,7 @@ command per approval drives the whole ripple.
 - VPN OFF (Atlas kills the TLS handshake through a VPN) and your egress IP
   allowed in Atlas Network Access.
 - `pnpm install --config.minimum-release-age=0` once per checkout.
-- Run commands as `node packages/cli/bin/uberprompt.mjs <cmd>` (or `uberprompt`
+- Run commands as `node packages/cli/bin/uberprompt.ts <cmd>` (or `uberprompt`
   after `npm link` in `packages/cli`).
 
 ## Embedding-space repair (run first if vector search behaves strangely)
