@@ -6,20 +6,37 @@
   --vp-c-bg: #F0F0F2;
   --vp-c-bg-soft: #E8E6EC;
   --vp-c-bg-mute: #DDDBE2;
+  --vp-c-bg-alt: #FAFAFA;
   --vp-c-text-1: #28262E;
   --vp-c-text-2: #636070;
   --vp-c-text-3: #9895A3;
   --vp-c-divider: #DDDBE2;
+  --vp-c-default-1: #28262E;
+  --vp-c-default-2: #636070;
+  --vp-c-default-3: #9895A3;
+  --vp-c-default-soft: #E8E6EC;
 
   --vp-button-brand-bg: #D8868E;
   --vp-button-brand-hover-bg: #B85A64;
   --vp-button-brand-active-bg: #A04E58;
   --vp-button-brand-text: #fff;
+  --vp-button-alt-bg: #E8E6EC;
+  --vp-button-alt-hover-bg: #DDDBE2;
+  --vp-button-alt-text: #28262E;
 
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(135deg, #D8868E, #B8B0C8);
-  --vp-home-hero-image-background-image: linear-gradient(135deg, #D8868E33, #B8B0C833);
-  --vp-home-hero-image-filter: blur(44px);
+  --vp-home-hero-name-color: #28262E;
+  --vp-home-hero-image-background-image: radial-gradient(#D8868E22, #B8B0C811);
+  --vp-home-hero-image-filter: blur(68px);
+
+  --vp-sidebar-bg-color: #F0F0F2;
+  --vp-nav-bg-color: #F0F0F2;
+  --vp-code-bg: #E8E6EC;
+
+  --up-accent: #D8868E;
+  --up-accent-light: #E89BA0;
+  --up-grey: #B8B0C8;
+  --up-grey-pastel: #E8E6EC;
+  --up-mono: "SF Mono", "Cascadia Code", "Fira Code", "Consolas", monospace;
 }
 
 .dark {
@@ -30,39 +47,104 @@
   --vp-c-bg: #14131A;
   --vp-c-bg-soft: #1C1A24;
   --vp-c-bg-mute: #24222E;
+  --vp-c-bg-alt: #1C1A24;
   --vp-c-text-1: #E4E0EC;
   --vp-c-text-2: #A09AB0;
   --vp-c-text-3: #6A6478;
   --vp-c-divider: #2A2834;
+  --vp-c-default-1: #E4E0EC;
+  --vp-c-default-2: #A09AB0;
+  --vp-c-default-3: #6A6478;
+  --vp-c-default-soft: #24222E;
 
   --vp-button-brand-bg: #D8868E;
   --vp-button-brand-hover-bg: #E89BA0;
   --vp-button-brand-active-bg: #F0B0B5;
   --vp-button-brand-text: #14131A;
+  --vp-button-alt-bg: #24222E;
+  --vp-button-alt-hover-bg: #2A2834;
+  --vp-button-alt-text: #E4E0EC;
 
-  --vp-home-hero-name-background: linear-gradient(135deg, #E89BA0, #B8B0C8);
-  --vp-home-hero-image-background-image: linear-gradient(135deg, #E89BA044, #B8B0C844);
+  --vp-home-hero-name-color: #E4E0EC;
+  --vp-home-hero-image-background-image: radial-gradient(#E89BA022, #B8B0C811);
+
+  --vp-sidebar-bg-color: #14131A;
+  --vp-nav-bg-color: #14131A;
+  --vp-code-bg: #24222E;
+
+  --up-accent: #E89BA0;
+  --up-accent-light: #F0B0B5;
+  --up-grey: #B8B0C8;
+  --up-grey-pastel: #24222E;
+}
+
+.name.clip {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  -webkit-text-fill-color: var(--vp-home-hero-name-color) !important;
+  font-family: var(--up-mono) !important;
+  font-weight: 700 !important;
+}
+
+.name.clip .u-pink {
+  -webkit-text-fill-color: var(--up-accent) !important;
+  color: var(--up-accent) !important;
 }
 
 .VPNavBarTitle .title {
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace;
+  font-family: var(--up-mono);
   font-weight: 700;
   letter-spacing: -0.02em;
-  display: inline-block;
 }
 
-.VPNavBarTitle .title::first-letter {
-  color: var(--vp-c-brand-1);
+.VPHero .text {
+  color: var(--vp-c-text-2) !important;
 }
 
-.VPHero .name {
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace !important;
+.VPHero .tagline {
+  color: var(--vp-c-text-3) !important;
 }
 
-.name .clip {
-  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", "Cascadia Code", monospace !important;
+.VPFeature {
+  border-color: var(--vp-c-divider) !important;
+  background-color: var(--vp-c-bg-alt) !important;
 }
 
 .VPFeature .title {
-  color: var(--vp-c-brand-1) !important;
+  color: var(--up-accent) !important;
+}
+
+.VPFeature .details {
+  color: var(--vp-c-text-2) !important;
+}
+
+.VPSidebar {
+  background-color: var(--vp-sidebar-bg-color) !important;
+}
+
+.VPNavBar {
+  background-color: var(--vp-nav-bg-color) !important;
+}
+
+.vp-doc h1,
+.vp-doc h2 {
+  border-color: var(--vp-c-divider) !important;
+}
+
+.vp-doc a {
+  color: var(--up-accent) !important;
+}
+
+.vp-doc a:hover {
+  color: var(--up-accent-light) !important;
+}
+
+.vp-doc code {
+  background-color: var(--vp-code-bg) !important;
+  color: var(--up-accent) !important;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-bg-soft) !important;
 }
