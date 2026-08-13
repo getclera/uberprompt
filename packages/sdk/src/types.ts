@@ -4,6 +4,7 @@ export const COLLECTIONS = {
   prompts: "prompts",
   promptVersions: "prompt_versions",
   edges: "edges",
+  spans: "spans",
   traces: "traces",
   lessons: "lessons",
   proposals: "proposals",
@@ -31,6 +32,7 @@ export interface PromptDoc {
 export interface PromptVersionDoc extends PromptDoc {
   promptName: string;
   frozenAt: Date;
+  contentHash?: string;
 }
 
 export interface EdgeEndpoint {
@@ -46,17 +48,73 @@ export interface EdgeDoc {
   note?: string;
 }
 
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
+
+export interface GenAiFacts {
+  operation?: string;
+  provider?: string;
+  requestModel?: string;
+  responseModel?: string;
+  responseId?: string;
+  finishReasons?: string[];
+  toolName?: string;
+  toolCallId?: string;
+  usage?: TokenUsage;
+}
+
+export interface PromptRef {
+  name: string;
+  version: number;
+  versionId: ObjectId;
+  contentHash: string;
+}
+
+export interface SpanDoc {
+  _id?: ObjectId;
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string;
+  name: string;
+  kind: string;
+  service: string;
+  startTime: Date;
+  endTime: Date;
+  durationMs: number;
+  status: "ok" | "error";
+  statusMessage?: string;
+  genAi?: GenAiFacts;
+  prompt?: PromptRef;
+  input?: unknown;
+  output?: string;
+  attributes: Record<string, unknown>;
+  resource: Record<string, unknown>;
+  ingestedAt: Date;
+}
+
 export interface TraceDoc {
   _id?: ObjectId;
-  promptName: string;
-  promptVersion: number;
-  input: object;
+  traceId: string;
+  service: string;
+  operation: string;
+  promptName?: string;
+  promptVersion?: number;
+  promptVersionId?: ObjectId;
+  contentHash?: string;
+  input: unknown;
   output: string;
   meta: {
+    provider?: string;
     model: string;
     latencyMs: number;
-    tokens?: object;
+    tokens?: TokenUsage;
   };
+  spanCount: number;
   score?: number;
   error?: string;
   ts: Date;
