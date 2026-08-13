@@ -2,7 +2,7 @@
 
 **Your prompts are a team. überprompt keeps them semantically in sync.**
 
-📖 **Docs: [ueberprompt.getclera.com](https://ueberprompt.getclera.com/)**
+📖 **Docs: [uberprompt.getclera.com](https://uberprompt.getclera.com/)**
 
 Prompts in a real AI product are a distributed system: shared tone-of-voice
 fragments, duplicated policy rules, agents whose prompts must agree with each
@@ -124,7 +124,7 @@ once. Prefer a fixed copy instead of the live symlink? `npm i -g ./packages/cli`
 
 ## Read more
 
-- **[ueberprompt.getclera.com](https://ueberprompt.getclera.com/)** — the hosted
+- **[uberprompt.getclera.com](https://uberprompt.getclera.com/)** — the hosted
   documentation site: guides and the full CLI reference.
 - [docs/IDEA.md](docs/IDEA.md) — the full architecture, data model contract, and
   the MongoDB features behind each stage.
