@@ -42,6 +42,7 @@ export default defineConfig({
           { text: "init", link: "/cli/init" },
           { text: "collect", link: "/cli/collect" },
           { text: "tail", link: "/cli/tail" },
+          { text: "learn", link: "/cli/learn" },
         ],
       },
     ],

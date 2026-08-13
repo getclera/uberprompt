@@ -35,6 +35,7 @@ uberprompt <command>
 | [`init`](/cli/init) | Create trace-ingestion collections and indexes |
 | [`collect`](/cli/collect) | Run an OTLP/HTTP span receiver |
 | [`tail`](/cli/tail) | Print recent traces and stream new ones |
+| [`learn`](/cli/learn) | Mine traces into deduped lessons (stage 2) |
 
 ## Environment
 

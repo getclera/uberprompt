@@ -41,7 +41,8 @@ branches listed in IDEA.md instead of rewriting.
     streamed a new trace as it landed, via change stream.
   - [ ] Demo app emitting real traces (needs ANTHROPIC_API_KEY).
   - Stage 2 note: `traces` now has `promptName` optional — filter `{ promptName: { $exists: true } }`.
-- [ ] (claude builder — in progress) 2 — Analyze/learn: trace batches → lessons (embedded, deduped), as `uberprompt learn` CLI subcommand
+- [x] (claude builder) 2 — Analyze/learn: `uberprompt learn` mines traces (`promptName` exists, error/low-score first) → per-prompt LLM lesson mining → Voyage embed → `$vectorSearch` dedup vs active lessons (≥0.92 merges trace ids via `$addToSet` instead of inserting; this is the stage's idempotency). Verified: 33/33 CLI tests + live Atlas dry-run (14 traces → 7 lessons, 3 healthy groups, 0 writes).
+  - Gotcha: the LIVE `lessons_embedding` index has no `filter` fields (create-indexes.ts declares status/appliesTo but was never re-applied) — `$vectorSearch` with `filter` errors, so `learn` fetches 5 candidates and filters `status: "active"` in code.
 - [x] (talwe+claude — done, pending merge) 3 — Apply per IDEA.md: `uberprompt
       propose / proposals / approve|reject`. Targeting ladder (lineage → catalog LLM
       pass → $vectorSearch over `descriptions_embedding`), minimal-rewrite pending
