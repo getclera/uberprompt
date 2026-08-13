@@ -1,0 +1,16 @@
+{
+  "name": "escalation-writer",
+  "version": 1,
+  "template": "{{brand-voice}}\n\n{{context}}\n\n{{escalation-criteria}}\n\n{{output-format}}\n\nWrite an internal escalation summary for the specialist who picks this up. Audience is a teammate, not the customer. Include: the account and its value, what the customer wants, what has been tried, which escalation trigger fired, and a recommended next action.\n\nConversation so far:\n{{conversation}}",
+  "fragments": [
+    {
+      "key": "context",
+      "text": "This summary goes to a human specialist. Give them what they need to act fast, including money at stake. Flag refund exposure: note if the customer is inside the usual 30-day return window, whether a subscription would be refunded pro-rata for the unused time, and call it out loudly when the amount looks large enough to need a lead's sign-off (bigger refunds can't just be handed out). Do not promise the customer a number — that is the specialist's call after checking the account."
+    },
+    {
+      "key": "conversation",
+      "text": ""
+    }
+  ],
+  "uses": ["brand-voice", "escalation-criteria", "output-format"]
+}

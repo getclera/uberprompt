@@ -1,0 +1,62 @@
+[
+  {
+    "from": { "prompt": "triage-router" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Router emits the shared structured ticket envelope."
+  },
+  {
+    "from": { "prompt": "billing-agent" },
+    "to": { "fragment": "brand-voice" },
+    "kind": "uses",
+    "note": "Billing replies inherit the Acme Cloud tone."
+  },
+  {
+    "from": { "prompt": "billing-agent" },
+    "to": { "fragment": "refund-policy" },
+    "kind": "uses",
+    "note": "Refund handling must follow the canonical policy."
+  },
+  {
+    "from": { "prompt": "billing-agent" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Billing replies use the shared response format."
+  },
+  {
+    "from": { "prompt": "tech-support-agent" },
+    "to": { "fragment": "brand-voice" },
+    "kind": "uses",
+    "note": "Tech support replies inherit the Acme Cloud tone."
+  },
+  {
+    "from": { "prompt": "tech-support-agent" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Tech support replies use the shared response format."
+  },
+  {
+    "from": { "prompt": "escalation-writer" },
+    "to": { "fragment": "brand-voice" },
+    "kind": "uses",
+    "note": "Escalation summaries stay on-brand for downstream teams."
+  },
+  {
+    "from": { "prompt": "escalation-writer" },
+    "to": { "fragment": "escalation-criteria" },
+    "kind": "uses",
+    "note": "Escalation writer applies the canonical escalation criteria."
+  },
+  {
+    "from": { "prompt": "escalation-writer" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Escalation summaries use the shared response format."
+  },
+  {
+    "from": { "prompt": "satisfaction-summarizer" },
+    "to": { "fragment": "output-format" },
+    "kind": "uses",
+    "note": "Satisfaction summaries use the shared response format."
+  }
+]
