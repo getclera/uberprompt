@@ -16,7 +16,7 @@ async function loadPending(db, _id) {
   return proposal;
 }
 
-async function snapshotVersion(db, prompt) {
+export async function snapshotVersion(db, prompt) {
   const hash = contentHash(prompt);
   const versions = db.collection("prompt_versions");
   const existing = await versions.findOne({
@@ -68,11 +68,12 @@ export async function runReject(repoRoot, id) {
   }
 }
 
-export async function runApprove(repoRoot, id) {
+export async function runApprove(repoRoot, id, opts = {}) {
   const env = loadEnv(repoRoot);
   requireEnv(env, ["MONGODB_URI", "MONGODB_DB", "VOYAGE_API_KEY"]);
   const _id = await parseObjectId(id);
   const { client, db } = await connect(env);
+  let applied;
   try {
     const proposal = await loadPending(db, _id);
     if (!proposal.target.fragment) {
@@ -99,6 +100,7 @@ export async function runApprove(repoRoot, id) {
     const { versionId, created } = await snapshotVersion(db, prompt);
     const embedding = await voyageEmbed(env, proposal.newText);
     const newVersion = prompt.version + 1;
+    const updatedAt = new Date();
     const res = await db.collection("prompts").updateOne(
       { _id: prompt._id, version: prompt.version },
       {
@@ -106,7 +108,7 @@ export async function runApprove(repoRoot, id) {
           [`fragments.${idx}.text`]: proposal.newText,
           [`fragments.${idx}.embedding`]: embedding,
           version: newVersion,
-          updatedAt: new Date(),
+          updatedAt,
           updatedBy: "cli",
         },
       }
@@ -116,6 +118,16 @@ export async function runApprove(repoRoot, id) {
         `prompt "${prompt.name}" changed concurrently — approve aborted after snapshot, prompt untouched`
       );
     }
+    const updated = {
+      ...prompt,
+      fragments: prompt.fragments.map((f, i) =>
+        i === idx ? { ...f, text: proposal.newText, embedding } : f
+      ),
+      version: newVersion,
+      updatedAt,
+      updatedBy: "cli",
+    };
+    const { versionId: newVersionId } = await snapshotVersion(db, updated);
     await db.collection("proposals").updateOne({ _id }, { $set: { status: "applied" } });
 
     console.log(
@@ -124,9 +136,24 @@ export async function runApprove(repoRoot, id) {
     console.log(
       `  snapshot ${created ? "created" : "reused"}: prompt_versions ${versionId} (v${prompt.version})`
     );
+    console.log(`  snapshot created: prompt_versions ${newVersionId} (v${newVersion})`);
     console.log("  fragment re-embedded (voyage-3.5-lite)");
-    return 0;
+    applied = {
+      promptName: prompt.name,
+      fragmentKey: proposal.target.fragment,
+      oldText: proposal.oldText,
+      newText: proposal.newText,
+      refId: newVersionId,
+    };
   } finally {
     await client.close();
   }
+  if (opts["no-sync"]) return 0;
+  const { runSyncCheck } = await import("./sync.mjs");
+  return runSyncCheck(repoRoot, applied.promptName, applied.fragmentKey, applied.newText, {
+    oldText: applied.oldText,
+    refId: applied.refId,
+    model: opts.model,
+    dryRun: opts["dry-run"],
+  });
 }
