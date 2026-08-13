@@ -7,7 +7,7 @@ branches listed in IDEA.md instead of rewriting.
 ## Setup
 - [x] (talwe+claude) Atlas cluster `cluster0.u7elw1` up, db `uberprompt` + 6 collections + 3 vector indexes (fragments/descriptions/lessons, 1024d cosine) created; MONGODB_URI in .env; MongoDB MCP in .mcp.json (needs session restart + approve)
 - [ ] (talwe — HUMAN) still missing in .env: ANTHROPIC_API_KEY, VOYAGE_API_KEY
-- [ ] (unclaimed) Re-land monorepo + SDK from `claude/sdk-scaffold` once plan is locked
+- [ ] (shlok — PR open, branch `shlok/sdk-reland`) Re-land monorepo + SDK from `claude/sdk-scaffold`, reconciled with the current contract
 - [x] (felix/claude) Demo example: support-crew prompt/fragment/edge/trace JSON files
 - [x] (felix/claude) Demo scenario runner (apply.mjs, raise-escalation-threshold)
 - [ ] (felix/claude — in progress) `uberprompt` CLI: infer / affected / graph (packages/cli)

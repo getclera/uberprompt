@@ -85,9 +85,10 @@ Database `uberprompt`, collections:
 
 // prompt_versions — immutable snapshots (same shape + { promptName, frozenAt })
 
-// edges — dependency graph
-{ _id, from: { prompt: string, fragment?: string },
-  to:   { prompt: string, fragment?: string },
+// edges — dependency graph; fragment-only endpoint = shared fragment
+// (matches apps/demo/edges.json + expected-semantic-edges.json)
+{ _id, from: { prompt?: string, fragment?: string },
+  to:   { prompt?: string, fragment?: string },
   kind: "uses" | "semantic",   // "uses" = declared in SDK; "semantic" = agent-found
   note?: string,
   // semantic edges only — inference provenance:
