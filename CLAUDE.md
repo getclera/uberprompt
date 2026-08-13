@@ -99,8 +99,8 @@ Default model **`gpt-5.1`**; cheap variant for bulk/low-stakes calls is
 
 - **VOYAGE_API_KEY is Atlas-issued**: it 403s on `api.voyageai.com`. Use
   `https://ai.mongodb.com/v1/embeddings` (same request shape, 1024d verified).
-  `packages/sdk/src/embeddings.ts` still points at voyageai.com and will 403 — fix
-  pending.
+  `packages/sdk/src/embeddings.ts` now points there (fixed); override with
+  `VOYAGE_EMBEDDINGS_URL` if the host ever moves.
 - Fresh `pnpm install` fails on `ai@7.0.65` (younger than pnpm's 24h
   supply-chain default): use `pnpm install --config.minimum-release-age=0`.
 - Atlas + VPN don't mix (TLS handshake dies, looks like bad password) — see
