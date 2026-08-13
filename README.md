@@ -106,18 +106,19 @@ uberprompt compare <prompt>        # did the new version actually help? (per-ver
 
 ### Installing the CLI on your PATH
 
-One command, from the repo root:
+From the repo root:
 
 ```sh
-cd packages/cli && npm link
+cd packages/cli && npm install && npm link
 ```
 
-That symlinks `uberprompt` onto your PATH (and installs its one dependency).
-Because it is a symlink into your checkout, every `git pull` updates the CLI
-automatically — no reinstall. Run it from anywhere inside the repo (it finds
-`apps/demo` via git). If a later pull adds a new dependency to
-`packages/cli/package.json`, run `npm install` there once. Prefer a fixed copy
-instead of the live symlink? `npm i -g ./packages/cli`.
+That symlinks `uberprompt` onto your PATH. The `npm install` is required
+first — on modern npm, `npm link` alone does NOT install dependencies, it
+only creates the global symlink. Because it is a symlink into your checkout,
+every `git pull` updates the CLI automatically — no reinstall. Run it from
+anywhere inside the repo (it finds `apps/demo` via git). If a later pull adds
+a new dependency to `packages/cli/package.json`, run `npm install` there
+once. Prefer a fixed copy instead of the live symlink? `npm i -g ./packages/cli`.
 
 ## Read more
 
