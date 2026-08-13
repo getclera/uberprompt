@@ -8,9 +8,9 @@ import {
 } from "./store.mjs";
 
 const VERIFY_PAIRS = [
-  { a: "tech-support-agent.task", b: "triage-router.routing-rules", min: 0.8 },
-  { a: "tech-support-agent.task", b: "escalation-writer.escalation-criteria", min: 0.8 },
-  { a: "tech-support-agent.task", b: "satisfaction-summarizer.output-format", max: 0.8 },
+  { a: "triage-router.routing-rules", b: "escalation-writer.escalation-criteria", min: 0.8 },
+  { a: "escalation-writer.context", b: "refund-agent.refund-policy", min: 0.8 },
+  { a: "satisfaction-summarizer.task", b: "order-agent.task", max: 0.8 },
 ];
 
 function fragmentVector(prompts, id) {
