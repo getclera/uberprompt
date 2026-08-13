@@ -26,8 +26,12 @@ All commands take `--dir <path>` (a demo dir containing `prompts/`, `fragments/`
 - **`graph`** — print each shared fragment with its dependents. Declared `uses`
   edges are plain; discovered `semantic` edges are marked `⚠` with confidence.
   `--json` for machine output.
-- **`affected [--base <ref>] [--staged]`** — map git-changed prompt/fragment
-  files to graph nodes and report the affected dependents (with via-path + edge
+- **`affected <node>`** — node mode: pass one prompt (`billing-agent`), shared
+  fragment (`escalation-criteria`), or local fragment
+  (`triage-router.routing-rules`) and get both directions with backing files:
+  what depends on it (affected by a change) and what it depends on.
+- **`affected [--base <ref>] [--staged]`** — git mode: map git-changed
+  prompt/fragment files to graph nodes and report the affected dependents (with via-path + edge
   kind). Default compares the working tree against `HEAD`. Always exits 0.
   `--json` for machine output.
 - **`infer [--apply] [--threshold 0.7]`** — ask the model (`claude-opus-5`) for
