@@ -14,22 +14,37 @@ export interface WatchOptions {
   drainBacklog?: boolean;
 }
 
-export async function watch(opts: WatchOptions = {}): Promise<() => Promise<void>> {
+export interface WatchDeps {
+  openWatcher: (onLesson: (lesson: LessonDoc) => Promise<void>) => Promise<LessonWatcher>;
+  fetchBacklog: () => Promise<LessonDoc[]>;
+  handle: (lessonId: ObjectId) => Promise<void>;
+}
+
+export const defaultWatchDeps: WatchDeps = {
+  openWatcher: (onLesson) => watchLessonsResumable(WATCHER_NAME, onLesson),
+  fetchBacklog: backlog,
+  handle: run,
+};
+
+export async function watch(
+  opts: WatchOptions = {},
+  deps: WatchDeps = defaultWatchDeps,
+): Promise<() => Promise<void>> {
+  const watcher = await deps.openWatcher(async (lesson) => {
+    if (!lesson._id) return;
+    console.log(`lesson ${lesson._id.toHexString()} inserted`);
+    await deps.handle(lesson._id);
+  });
+  console.log(`watching lessons as "${WATCHER_NAME}" — stage 3 will file proposals as they arrive`);
+
   if (opts.drainBacklog !== false) {
-    const pending = await backlog();
+    const pending = await deps.fetchBacklog();
     console.log(`backlog: ${pending.length} unprocessed lesson(s)`);
     for (const lesson of pending) {
-      if (lesson._id) await run(lesson._id);
+      if (lesson._id) await deps.handle(lesson._id);
     }
   }
 
-  const watcher: LessonWatcher = await watchLessonsResumable(WATCHER_NAME, async (lesson) => {
-    if (!lesson._id) return;
-    console.log(`lesson ${lesson._id.toHexString()} inserted`);
-    await run(lesson._id);
-  });
-
-  console.log(`watching lessons as "${WATCHER_NAME}" — stage 3 will file proposals as they arrive`);
   return () => watcher.close();
 }
 
