@@ -42,21 +42,13 @@ the version bump happens on approval.
 3. **RAG**: vector search of the lesson embedding over embedded *purpose
    descriptions* (`descriptions_embedding`), not literal prompt text — decided
    IN scope, it's cheap.
-4. **Culprit**: within each targeted prompt, which *fragment* is at fault and which
-   exact *span* of its text causes the failure. Rungs 1–3 answer "which prompts";
-   this answers "which words". The span is quoted verbatim and validated as a real
-   substring, so the proposal can point at the bad actor rather than just describe
-   it. The culprit fragment may be shared, so its blast radius (other prompts using
-   it, via `edges`) is recorded alongside.
+**Benched (good ideas, not today's scope — from PR #8/#32):** culprit rung
+(fragment+span-level fault localization with blast radius) and the eval gate
+(pairwise-judged replay + golden-set scoring before a proposal surfaces, with the
+`"evaluating"` status). Layer onto the approve path if un-benched.
 
-**Eval gate.** A proposal is only surfaced if its candidate text is measurably
-better than what it replaces. Each candidate is scored against the live fragment on
-(a) replayed inputs from the failing traces that produced the lesson and (b) a
-curated golden set per prompt, both judged pairwise by an LLM on a fixed rubric.
-Hard gate: zero golden regressions, no replay losses, at least half the replay
-cases won. A failing candidate gets one revision attempt with the judge's critique
-fed back; if it fails again the proposal is stored `rejected` with its eval report
-and never surfaced. Evals are headless — the scorecard rides on the proposal.
+**Stage 3→4 handoff:** approve's version bump is the trigger; Felix's dependency
+check (stage 4) consumes it (change-stream or explicit invoke — Felix's call).
 
 Hygiene: minimal-edit rewrites, skip identical pending proposals, group proposals
 per prompt (one approval = one version bump). Apply does NOT walk dependencies —
