@@ -82,3 +82,20 @@ it via fragment similarity, and flag drift when the shared source changes.
    restates parts of the refund policy (30-day window, pro-rated subscriptions,
    large refunds needing lead approval, never promise an amount) without using
    the shared `refund-policy` fragment.
+
+## Demo scenarios
+
+Scripted, reversible edits for the stage demo live in `scenarios/`:
+
+```
+node apps/demo/scenarios/apply.mjs raise-escalation-threshold          # apply
+node apps/demo/scenarios/apply.mjs raise-escalation-threshold --revert # undo
+```
+
+`raise-escalation-threshold` bumps the churn-risk threshold in
+`escalation-criteria` from $5k to $10k ARR (version bump included). The declared
+graph only reaches `escalation-writer`; the sync agent must *infer* that
+`triage-router.routing-rules` paraphrases the old threshold and propose the fix.
+Each scenario's `expected` block is the acceptance test for the inference, and
+`ticket.json` is a $7k churn probe whose routing flips once the inferred
+proposal is applied.

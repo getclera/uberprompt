@@ -1,0 +1,11 @@
+{
+  "description": "Before/after probe ticket: $7k ARR churn risk. Sits between the old ($5k) and new ($10k) escalation thresholds, so triage-router's lane flips only after the inferred routing-rules fix is applied.",
+  "promptName": "triage-router",
+  "input": {
+    "ticketId": "AC-10488",
+    "from": "dana@brightloop.io",
+    "account": { "company": "Brightloop", "plan": "Team", "arr": 7000 },
+    "subject": "Considering cancelling — pricing no longer works for us",
+    "body": "Hi, we've been reviewing our tooling budget and Acme Cloud's renewal quote is hard to justify. Unless there's flexibility on pricing we'll likely cancel at the end of this billing period. Can someone walk me through our options?"
+  }
+}
